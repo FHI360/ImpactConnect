@@ -2,12 +2,12 @@ import { useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { CalendarInput } from '@dhis2/ui';
 import React, { useEffect, useState } from 'react';
-import { MainTitle } from '../../consts.js';
+import { config, MainTitle } from '../../consts.js';
 import { provisionOUs } from '../../utils.js';
+import { Navigation } from '../Navigation.js';
 import OrganisationUnitComponent from '../OrganisationUnitComponent.js';
 import ProgramComponent from '../ProgramComponent.js';
 import ProgramStageComponent from '../ProgramStageComponent.js';
-import { Navigation } from '../Navigation';
 
 export const Main = () => {
 
@@ -28,6 +28,15 @@ export const Main = () => {
     const [group, setGroup] = useState("");
     const [scrollHeight, setScrollHeight] = useState('350px');
     const [selectedOU, setSelectedOU] = useState([]);
+    const [nameAttributes, setNameAttributes] = useState([]);
+    const [filterAttributes, setFilterAttributes] = useState([]);
+    const [configuredStages, setConfiguredStages] = useState({});
+
+    const dataStoreQuery = {
+        dataStore: {
+            resource: `dataStore/${config.dataStoreName}?fields=.`,
+        }
+    };
 
     const eventQuery = {
         events: {
@@ -91,6 +100,19 @@ export const Main = () => {
     });
 
     const {data: elementsData, refetch: refetchDataElements} = useDataQuery(dataElementsQuery, {variables: {id: selectedStage}});
+
+    const {data: dataStore} = useDataQuery(dataStoreQuery);
+
+    useEffect(() => {
+        if (dataStore?.dataStore?.entries) {
+            const entry = dataStore.dataStore.entries.find(e => e.key === selectedProgram);
+            if (entry) {
+                setNameAttributes(entry.value.nameAttributes || []);
+                setFilterAttributes(entry.value.filterAttributes || []);
+                setConfiguredStages(entry.value.configuredStages || {})
+            }
+        }
+    }, [dataStore, selectedProgram]);
 
     useEffect(() => {
 
@@ -222,7 +244,9 @@ export const Main = () => {
     }
 
     const getParticipant = (entity) => {
-        return entity.enrollments[0].attributes?.find(attribute => attribute.attribute === 'd0TWps521Vi')?.value;
+        return nameAttributes.map(attr => {
+            return entity.enrollments[0].attributes?.find(attribute => attribute.attribute === attr)?.value
+        }).join(' ')
     }
 
     const dataElementValue = (dataElement, entity) => {
@@ -428,7 +452,9 @@ export const Main = () => {
                                                                                     <div
                                                                                         className="flex flex-col gap-1">
                                                                                         {dataElements.map(de => {
-                                                                                            if (de.valueType === 'TRUE_ONLY') {
+                                                                                            console.log('Configured stages', configuredStages)
+                                                                                            const configuredDataElements = configuredStages[selectedStage] || [];
+                                                                                            if (de.valueType === 'TRUE_ONLY' && configuredDataElements.includes(de.id)) {
                                                                                                 return <>
                                                                                                     <div
                                                                                                         className="flex items-center mb-4">
@@ -443,7 +469,7 @@ export const Main = () => {
                                                                                                     </div>
                                                                                                 </>
                                                                                             }
-                                                                                            if (de.valueType === 'INTEGER_ZERO_OR_POSITIVE') {
+                                                                                            if (de.valueType === 'INTEGER_ZERO_OR_POSITIVE'  && configuredDataElements.includes(de.id)) {
                                                                                                 return <>
                                                                                                     <div
                                                                                                         className="mb-5">
