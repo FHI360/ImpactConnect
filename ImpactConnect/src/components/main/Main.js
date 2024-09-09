@@ -26,7 +26,7 @@ export const Main = () => {
     const [pageSize, setPageSize] = useState(50);
     const [entities, setEntities] = useState([]);
     const [allEntities, setAllEntities] = useState([]);
-    const [group, setGroup] = useState("");
+    const [filterValue, setFilterValue] = useState({});
     const [scrollHeight, setScrollHeight] = useState('350px');
     const [selectedOU, setSelectedOU] = useState([]);
     const [nameAttributes, setNameAttributes] = useState([]);
@@ -44,7 +44,7 @@ export const Main = () => {
     const attributesQuery = {
         attributes: {
             resource: `trackedEntityAttributes`,
-            params: ({program}) =>({
+            params: ({program}) => ({
                 fields: ['id', 'displayName', 'optionSet(id)', 'valueType'],
                 paging: 'false',
                 program: program
@@ -120,7 +120,10 @@ export const Main = () => {
 
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
-    const {data: attributesData, refetch: attributesRefetch} = useDataQuery(attributesQuery, {variables: {program: selectedProgram}});
+    const {
+        data: attributesData,
+        refetch: attributesRefetch
+    } = useDataQuery(attributesQuery, {variables: {program: selectedProgram}});
 
     useEffect(() => {
         if (dataStore?.dataStore?.entries) {
@@ -163,13 +166,15 @@ export const Main = () => {
     useEffect(() => {
         if (entityData && entityData.entities) {
             setAllEntities(entityData.entities.instances);
-            if (group) {
-                const entities = entityData.entities.instances.filter(entity => {
-                    const attribute = entity.attributes.find(attr => attr.attribute === "Rsqd5535sPL");
-                    return attribute && attribute.value === group;
-                });
+            if (filterValue && Object.keys(filterValue).length) {
+                Object.keys(filterValue).forEach(key => {
+                    const entities = entityData.entities.instances.filter(entity => {
+                        const attribute = entity.attributes.find(attr => attr.attribute === key);
+                        return attribute && attribute.value + '' === filterValue[key] + '';
+                    });
 
-                setEntities(entities);
+                    setEntities(entities);
+                })
             } else {
                 setEntities(entityData.entities.instances);
             }
@@ -207,7 +212,7 @@ export const Main = () => {
 
     useEffect(() => {
         attributesRefetch({program: selectedProgram})
-        if (attributesData?.attributes?.trackedEntityAttributes){
+        if (attributesData?.attributes?.trackedEntityAttributes) {
             setEntityAttributes(attributesData?.attributes?.trackedEntityAttributes)
         }
     }, [attributesData, selectedProgram])
@@ -233,13 +238,15 @@ export const Main = () => {
         calculateDatesBetween(startDate, endDate);
     }
 
-    const groupChanged = (event) => {
-        setGroup(event.target.value);
+    const filterEntities = (filterAttr, value) => {
+        const filterAttributes = filterValue;
+        filterAttributes[filterAttr] = value;
+        setFilterValue(filterAttributes);
 
-        if (event.target.value) {
+        if (value) {
             const entities = allEntities.filter(entity => {
-                const attribute = entity.attributes.find(attr => attr.attribute === "Rsqd5535sPL");
-                return attribute && attribute.value === event.target.value;
+                const attribute = entity.attributes.find(attr => attr.attribute === filterAttr);
+                return attribute && attribute.value + '' === value + '';
             });
 
             setEntities(entities);
@@ -345,7 +352,7 @@ export const Main = () => {
                                     </div>
                                 </div>
                                 {filterAttributes.map((attr) => {
-                                    const entityAttribute = entityAttributes.find(ea=> ea.id === attr);
+                                    const entityAttribute = entityAttributes.find(ea => ea.id === attr);
                                     if (entityAttribute) {
                                         if (entityAttribute.optionSet?.id) {
                                             const optionsQuery = {
@@ -357,11 +364,11 @@ export const Main = () => {
                                                     }
                                                 }
                                             }
-                                                engine.query(optionsQuery).then(d=> {
-                                                    const ao = attributeOptions;
-                                                    ao[attr] = d.optionSets?.options || [];
-                                                    setAttributeOptions(ao);
-                                                });
+                                            engine.query(optionsQuery).then(d => {
+                                                const ao = attributeOptions;
+                                                ao[attr] = d.optionSets?.options || [];
+                                                setAttributeOptions(ao);
+                                            });
                                             return <>
                                                 <div className="flex mb-2">
                                                     <div>
@@ -371,12 +378,14 @@ export const Main = () => {
                                                         </label>
                                                         <select id="program"
                                                                 className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                                                value={group}
-                                                                onChange={groupChanged}>
-                                                            <option selected>Choose {entityAttributes.find(a => a.id === attr)?.displayName}</option>
+                                                                value={filterValue[attr]}
+                                                                onChange={(event) => filterEntities(attr, event.target.value)}>
+                                                            <option
+                                                                selected>Choose {entityAttributes.find(a => a.id === attr)?.displayName}</option>
                                                             {(attributeOptions[attr] || []).map(option => {
                                                                     return <>
-                                                                        <option value={option.code}>{option.displayName}</option>
+                                                                        <option
+                                                                            value={option.code}>{option.displayName}</option>
                                                                     </>
                                                                 }
                                                             )}
@@ -384,14 +393,14 @@ export const Main = () => {
                                                     </div>
                                                 </div>
                                             </>
-                                        }
-                                        else {
+                                        } else {
                                             if (attr.valueType === 'TRUE_ONLY') {
                                                 return <>
                                                     <div
                                                         className="flex items-center mb-2">
                                                         <input
                                                             type="checkbox"
+                                                            onChange={(event) => filterEntities(attr, event.target.checked)}
                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                         <label
                                                             className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
@@ -410,6 +419,7 @@ export const Main = () => {
                                                         </label>
                                                         <input
                                                             type="number"
+                                                            onChange={(event) => filterEntities(attr, event.target.value)}
                                                             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
                                                     </div>
                                                 </>
@@ -424,6 +434,7 @@ export const Main = () => {
                                                         </label>
                                                         <input
                                                             type="text"
+                                                            onChange={(event) => filterEntities(attr, event.target.value)}
                                                             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
                                                     </div>
                                                 </>
@@ -536,7 +547,6 @@ export const Main = () => {
                                                                                     <div
                                                                                         className="flex flex-col gap-1">
                                                                                         {dataElements.map(de => {
-                                                                                            console.log('Configured stages', configuredStages)
                                                                                             const configuredDataElements = configuredStages[selectedStage] || [];
                                                                                             if (de.valueType === 'TRUE_ONLY' && configuredDataElements.includes(de.id)) {
                                                                                                 return <>
