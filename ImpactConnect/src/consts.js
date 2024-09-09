@@ -1,5 +1,5 @@
 export const config = {
-    dataStoreName: 'sherlock-project-definition',
+    dataStoreName: 'impact-project-definition',
     dataStoreSearchHistory: 'sherlock-search-history'
 }
 

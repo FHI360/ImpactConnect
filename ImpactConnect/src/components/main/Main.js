@@ -7,6 +7,7 @@ import { provisionOUs } from '../../utils.js';
 import OrganisationUnitComponent from '../OrganisationUnitComponent.js';
 import ProgramComponent from '../ProgramComponent.js';
 import ProgramStageComponent from '../ProgramStageComponent.js';
+import { Navigation } from '../Navigation';
 
 export const Main = () => {
 
@@ -273,9 +274,8 @@ export const Main = () => {
                 />
             </div>
             <div className="w-10/12 ml-4 mr-4 p-4 bg-gray-200 min-h-screen transition-all rounded-md">
+                <Navigation/>
                 <div className="p-6">
-                    {}
-
                     <div className="mx-auto w-full">
                         <div className="w-full">
                             <div className="flex flex-col">
