@@ -326,14 +326,14 @@ export const Main = () => {
                     selectedOU={selectedOU}
                 />
             </div>
-            <div className="w-10/12 ml-4 mr-4 p-4 bg-gray-200 min-h-screen transition-all rounded-md">
+            <div className="w-10/12 ml-4 mr-4 p-4 bg-gray-100 min-h-screen transition-all rounded-md">
                 <Navigation/>
                 <div className="p-6">
                     <div className="mx-auto w-full">
                         <div className="w-full">
                             <div className="flex flex-col">
-                                <div className="flex flex-row gap-1 mb-2">
-                                    <div className="w-3/12 flex flex-col">
+                                <div className="flex flex-col gap-1 mb-2">
+                                    <div className="w-3/12 rounded-md bg-white p-3">
                                         <div>
                                             <ProgramComponent
                                                 selectedProgram={selectedProgram}
@@ -341,7 +341,7 @@ export const Main = () => {
                                             />
                                         </div>
                                     </div>
-                                    <div className="w-3/12 flex flex-col">
+                                    <div className="w-3/12 rounded-md bg-white p-3">
                                         <div>
                                             <ProgramStageComponent
                                                 selectedProgram={selectedProgram}
@@ -351,99 +351,112 @@ export const Main = () => {
                                         </div>
                                     </div>
                                 </div>
-                                {filterAttributes.map((attr) => {
-                                    const entityAttribute = entityAttributes.find(ea => ea.id === attr);
-                                    if (entityAttribute) {
-                                        if (entityAttribute.optionSet?.id) {
-                                            const optionsQuery = {
-                                                optionSets: {
-                                                    resource: 'optionSets',
-                                                    id: entityAttribute.optionSet.id,
-                                                    params: {
-                                                        fields: 'id,options(code,displayName)',
+                                <div className="rounded-md bg-white p-3 mb-2 w-3/12">
+                                    <label htmlFor="stage"
+                                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white border-b-2 border-b-gray-800">
+                                        {i18n.t('Entity Filter')}
+                                    </label>
+                                    <div className="p-2">
+                                        {filterAttributes.map((attr) => {
+                                            const entityAttribute = entityAttributes.find(ea => ea.id === attr);
+                                            if (entityAttribute) {
+                                                if (entityAttribute.optionSet?.id) {
+                                                    const optionsQuery = {
+                                                        optionSets: {
+                                                            resource: 'optionSets',
+                                                            id: entityAttribute.optionSet.id,
+                                                            params: {
+                                                                fields: 'id,options(code,displayName)',
+                                                            }
+                                                        }
+                                                    }
+                                                    engine.query(optionsQuery).then(d => {
+                                                        const ao = attributeOptions;
+                                                        ao[attr] = d.optionSets?.options || [];
+                                                        setAttributeOptions(ao);
+                                                    });
+                                                    return <>
+                                                        <div className="flex mb-2">
+                                                            <div>
+                                                                <label htmlFor="program"
+                                                                       className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {i18n.t(`Select ${entityAttributes.find(a => a.id === attr)?.displayName}`)}
+                                                                </label>
+                                                                <select id="program"
+                                                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                                                        value={filterValue[attr]}
+                                                                        onChange={(event) => filterEntities(attr, event.target.value)}>
+                                                                    <option
+                                                                        selected>Choose {entityAttributes.find(a => a.id === attr)?.displayName}</option>
+                                                                    {(attributeOptions[attr] || []).map(option => {
+                                                                            return <>
+                                                                                <option
+                                                                                    value={option.code}>{option.displayName}</option>
+                                                                            </>
+                                                                        }
+                                                                    )}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                } else {
+                                                    if (attr.valueType === 'TRUE_ONLY') {
+                                                        return <>
+                                                            <div
+                                                                className="flex items-center mb-2">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    onChange={(event) => filterEntities(attr, event.target.checked)}
+                                                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                                                <label
+                                                                    className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                                                    {entityAttributes.find(a => a.id === attr)?.displayName}
+                                                                </label>
+                                                            </div>
+                                                        </>
+                                                    }
+                                                    if (attr.valueType === 'INTEGER_ZERO_OR_POSITIVE') {
+                                                        return <>
+                                                            <div
+                                                                className="mb-2">
+                                                                <label
+                                                                    className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {entityAttributes.find(a => a.id === attr)?.displayName}
+                                                                </label>
+                                                                <input
+                                                                    type="number"
+                                                                    onChange={(event) => filterEntities(attr, event.target.value)}
+                                                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
+                                                            </div>
+                                                        </>
+                                                    }
+                                                    if (attr.valueType === 'TEXT') {
+                                                        return <>
+                                                            <div
+                                                                className="mb-2">
+                                                                <label
+                                                                    className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {entityAttributes.find(a => a.id === attr)?.displayName}
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    onChange={(event) => filterEntities(attr, event.target.value)}
+                                                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
+                                                            </div>
+                                                        </>
                                                     }
                                                 }
                                             }
-                                            engine.query(optionsQuery).then(d => {
-                                                const ao = attributeOptions;
-                                                ao[attr] = d.optionSets?.options || [];
-                                                setAttributeOptions(ao);
-                                            });
-                                            return <>
-                                                <div className="flex mb-2">
-                                                    <div>
-                                                        <label htmlFor="program"
-                                                               className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                            {i18n.t(`Select ${entityAttributes.find(a => a.id === attr)?.displayName}`)}
-                                                        </label>
-                                                        <select id="program"
-                                                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                                                value={filterValue[attr]}
-                                                                onChange={(event) => filterEntities(attr, event.target.value)}>
-                                                            <option
-                                                                selected>Choose {entityAttributes.find(a => a.id === attr)?.displayName}</option>
-                                                            {(attributeOptions[attr] || []).map(option => {
-                                                                    return <>
-                                                                        <option
-                                                                            value={option.code}>{option.displayName}</option>
-                                                                    </>
-                                                                }
-                                                            )}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        } else {
-                                            if (attr.valueType === 'TRUE_ONLY') {
-                                                return <>
-                                                    <div
-                                                        className="flex items-center mb-2">
-                                                        <input
-                                                            type="checkbox"
-                                                            onChange={(event) => filterEntities(attr, event.target.checked)}
-                                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                        <label
-                                                            className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                                            {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                        </label>
-                                                    </div>
-                                                </>
-                                            }
-                                            if (attr.valueType === 'INTEGER_ZERO_OR_POSITIVE') {
-                                                return <>
-                                                    <div
-                                                        className="mb-2">
-                                                        <label
-                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                            {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            onChange={(event) => filterEntities(attr, event.target.value)}
-                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                    </div>
-                                                </>
-                                            }
-                                            if (attr.valueType === 'TEXT') {
-                                                return <>
-                                                    <div
-                                                        className="mb-2">
-                                                        <label
-                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                            {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            onChange={(event) => filterEntities(attr, event.target.value)}
-                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                    </div>
-                                                </>
-                                            }
+                                        })}
+                                        {!Object.keys(filterAttributes).length &&
+                                            <span>
+                                                {i18n.t('No Entity Filter')}
+                                            </span>
                                         }
-                                    }
-                                })}
+                                    </div>
+                                </div>
                                 <div className="flex flex-col w-full mb-2">
-                                    <div className="w-3/12">
+                                    <div className="w-3/12 rounded-md bg-white p-3 flex flex-row gap-4">
                                         <CalendarInput
                                             label="Event start date"
                                             calendar="gregory"
@@ -482,11 +495,13 @@ export const Main = () => {
                                                                     className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                             </div>
                                                         </th>
-                                                        <th data-priority="1" className="px-6 py-3" rowSpan={2}>#</th>
+                                                        <th data-priority="1" className="px-6 py-3" rowSpan={2}>#
+                                                        </th>
                                                         <th data-priority="2" className="px-6 py-3"
                                                             rowSpan={2}>Participant
                                                         </th>
-                                                        <th data-priority="3" className="px-6 py-3 mx-auto text-center"
+                                                        <th data-priority="3"
+                                                            className="px-6 py-3 mx-auto text-center"
                                                             colSpan={dates.length}>
                                                             Event dates
                                                         </th>
@@ -531,7 +546,8 @@ export const Main = () => {
                                                                     return <>
                                                                         <td key={idx} className="px-6 py-4">
                                                                             <div className="flex flex-row">
-                                                                                <div className="w-1/12 flex flex-col">
+                                                                                <div
+                                                                                    className="w-1/12 flex flex-col">
                                                                                     <div
                                                                                         className="flex items-center mb-4">
                                                                                         <input
@@ -543,7 +559,8 @@ export const Main = () => {
                                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                                                     </div>
                                                                                 </div>
-                                                                                <div className="w-11/12 flex flex-col">
+                                                                                <div
+                                                                                    className="w-11/12 flex flex-col">
                                                                                     <div
                                                                                         className="flex flex-col gap-1">
                                                                                         {dataElements.map(de => {
