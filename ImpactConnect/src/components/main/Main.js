@@ -1,9 +1,9 @@
 import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { CalendarInput } from '@dhis2/ui';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { config, MainTitle } from '../../consts.js';
-import { provisionOUs } from '../../utils.js';
+import { provisionOUs, SharedStateContext } from '../../utils.js';
 import { Navigation } from '../Navigation.js';
 import OrganisationUnitComponent from '../OrganisationUnitComponent.js';
 import ProgramComponent from '../ProgramComponent.js';
@@ -11,12 +11,22 @@ import ProgramStageComponent from '../ProgramStageComponent.js';
 
 export const Main = () => {
     const engine = useDataEngine();
+    const sharedState = useContext(SharedStateContext)
+
+    const {
+        selectedSharedOU,
+        setSelectedSharedOU,
+        selectedSharedProgram,
+        setSelectedSharedProgram,
+        selectedSharedOrgUnit,
+        setSelectedSharedOrgUnit
+    } = sharedState;
 
     const [selectedOUForQuery, setSelectedOUForQuery] = useState(false);
-    const [selectedProgram, setSelectedProgram] = useState('');
+    const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
     const [selectedStage, setSelectedStage] = useState('');
     const [dataElements, setDataElements] = useState([]);
-    const [orgUnit, setOrgUnit] = useState('');
+    const [orgUnit, setOrgUnit] = useState(selectedSharedOrgUnit);
     const [events, setEvents] = useState([]);
     const [dates, setDates] = useState([new Date()]);
     const [startDate, setStateDate] = useState(new Date());
@@ -28,7 +38,7 @@ export const Main = () => {
     const [allEntities, setAllEntities] = useState([]);
     const [filterValue, setFilterValue] = useState({});
     const [scrollHeight, setScrollHeight] = useState('350px');
-    const [selectedOU, setSelectedOU] = useState([]);
+    const [selectedOU, setSelectedOU] = useState(selectedSharedOU);
     const [nameAttributes, setNameAttributes] = useState([]);
     const [filterAttributes, setFilterAttributes] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
@@ -223,8 +233,18 @@ export const Main = () => {
      */
     const handleOUChange = event => {
         setOrgUnit(event.id);
-        setSelectedOU(event.selected)
+        setSelectedSharedOrgUnit(event.id);
+        setSelectedOU(event.selected);
+        setSelectedSharedOU(event.selected)
+        if (!event.checked) {
+            setSelectedSharedOrgUnit('')
+        }
     };
+
+    const handleProgramChange = (event) => {
+        setSelectedProgram(event);
+        setSelectedSharedProgram(event);
+    }
 
     const stateDateChanged = event => {
         const startDate = new Date(event.calendarDateString)
@@ -337,7 +357,8 @@ export const Main = () => {
                                         <div>
                                             <ProgramComponent
                                                 selectedProgram={selectedProgram}
-                                                setSelectedProgram={setSelectedProgram}
+                                                setSelectedProgram={handleProgramChange}
+                                                disabled={!selectedSharedOrgUnit}
                                             />
                                         </div>
                                     </div>
