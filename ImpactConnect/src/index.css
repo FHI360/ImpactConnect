@@ -122,6 +122,9 @@
 .gap-1 {
     gap: 0.25rem
 }
+.gap-4 {
+    gap: 1rem
+}
 .overflow-x-auto {
     overflow-x: auto
 }
@@ -143,6 +146,9 @@
 .border-b {
     border-bottom-width: 1px
 }
+.border-b-2 {
+    border-bottom-width: 2px
+}
 .border-t {
     border-top-width: 1px
 }
@@ -161,6 +167,10 @@
 .border-b-gray-800 {
     --tw-border-opacity: 1;
     border-bottom-color: rgb(31 41 55 / var(--tw-border-opacity))
+}
+.bg-\[\#2557D6\] {
+    --tw-bg-opacity: 1;
+    background-color: rgb(37 87 214 / var(--tw-bg-opacity))
 }
 .bg-\[\#f8f4f3\] {
     --tw-bg-opacity: 1;
@@ -195,6 +205,9 @@
 }
 .p-2\.5 {
     padding: 0.625rem
+}
+.p-3 {
+    padding: 0.75rem
 }
 .p-4 {
     padding: 1rem
