@@ -1,18 +1,30 @@
 import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Transfer } from '@dhis2/ui';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { config, MainTitle } from '../consts.js';
+import { SharedStateContext } from '../utils.js';
 import { Navigation } from './Navigation.js';
 import OrganisationUnitComponent from './OrganisationUnitComponent.js';
 import ProgramComponent from './ProgramComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
 
 const ConfigurationComponent = () => {
-    const [selectedOU, setSelectedOU] = useState([]);
+    const sharedState = useContext(SharedStateContext)
+
+    const {
+        selectedSharedOU,
+        setSelectedSharedOU,
+        selectedSharedProgram,
+        setSelectedSharedProgram,
+        selectedSharedOrgUnit,
+        setSelectedSharedOrgUnit
+    } = sharedState;
+
+    const [selectedOU, setSelectedOU] = useState(selectedSharedOU);
     const [keyExists, setKeyExists] = useState({});
     const [orgUnit, setOrgUnit] = useState('');
-    const [selectedProgram, setSelectedProgram] = useState('');
+    const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
     const [selectedStage, setSelectedStage] = useState('');
     const [attributes, setAttributes] = useState([]);
     const [nameAttributes, setNameAttributes] = useState([]);
@@ -82,8 +94,9 @@ const ConfigurationComponent = () => {
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
     useEffect(() => {
-        if (data && data.programs && selectedProgram) {
-            const attributes = data.programs?.programs.find(p => p.id === selectedProgram)?.programTrackedEntityAttributes?.map(attr => {
+        if ((data?.programs?.programs || data?.programs?.programTrackedEntityAttributes) && selectedProgram) {
+            const attributes = (data.programs?.programs?.find(p => p.id === selectedProgram)?.programTrackedEntityAttributes ||
+                data?.programs?.programTrackedEntityAttributes)?.map(attr => {
                 return {
                     label: attr.trackedEntityAttribute.displayName,
                     value: attr.trackedEntityAttribute.id
@@ -106,7 +119,6 @@ const ConfigurationComponent = () => {
     useEffect(() => {
         refetchStages({program: selectedProgram})
         if (stageData && stageData.programStages) {
-            console.log('Stages', stageData.programStages.programStages)
             setStages(stageData.programStages.programStages)
         }
     }, [selectedProgram, stageData]);
@@ -127,8 +139,20 @@ const ConfigurationComponent = () => {
 
     const handleOUChange = event => {
         setOrgUnit(event.id);
-        setSelectedOU(event.selected)
+        setSelectedSharedOrgUnit(event.id);
+        setSelectedOU(event.selected);
+        setSelectedSharedOU(event.selected)
+        if (!event.checked) {
+            setSelectedSharedOrgUnit('')
+        }
     };
+
+    const handleProgramChange = (event) => {
+        setSelectedProgram(event);
+        setSelectedSharedProgram(event);
+        setConfiguredStages({});
+        setSelectedDataElements([])
+    }
 
     const dataStoreOperation = (type, data) => {
         const value = {
@@ -167,7 +191,8 @@ const ConfigurationComponent = () => {
                                 <div className="w-3/12">
                                     <ProgramComponent
                                         selectedProgram={selectedProgram}
-                                        setSelectedProgram={setSelectedProgram}
+                                        setSelectedProgram={handleProgramChange}
+                                        disabled={!selectedSharedOrgUnit}
                                     />
                                 </div>
                             </div>

@@ -325,37 +325,19 @@ export const trimNameToMax50Chars = (name) => {
 export const SharedStateContext = createContext({
     selectedSharedOU: [],
     setSelectedSharedOU: () => {
-        console.log('OU selected')
-    },
-    selectedSharedAttr: [],
-    setSelectedSharedAttr: () => {
     },
     selectedSharedProgram: '',
     setSelectedSharedProgram: () => {
     },
-    fullOrgUnitSharedSearch: false,
-    setFullOrgUnitSharedSearch: () => {
-    },
-    selectedSharedProgramName: [],
-    setSelectedSharedProgramName: () => {
-    },
-    selectedOUSharedforQuery: [],
-    setSelectedSharedOUforQuery: () => {
-    },
-    persistSharedData: [],
-    setPersistSharedData: () => {
+    selectedSharedOrgUnit: '',
+    setSelectedSharedOrgUnit: () => {
     }
-
 })
 
 export const useSharedState = () => {
     const [selectedSharedOU, setSelectedSharedOU_] = useState([]);
-    const [selectedSharedAttr, setSelectedSharedAttr_] = useState([]);
-    const [selectedSharedProgram, setSelectedSharedProgram_] = useState([]);
-    const [selectedSharedProgramName, setSelectedSharedProgramName_] = useState([]);
-    const [selectedOUSharedforQuery, setSelectedSharedOUforQuery_] = useState([]);
-    const [fullOrgUnitSharedSearch, setFullOrgUnitSharedSearch_] = useState(false);
-    const [persistSharedData, setPersistSharedData_] = useState([]);
+    const [selectedSharedProgram, setSelectedSharedProgram_] = useState('');
+    const [selectedSharedOrgUnit, setSelectedSharedOrgUnit_] = useState('');
 
 
     // memoizedCallbacks
@@ -367,42 +349,22 @@ export const useSharedState = () => {
      */
     const setSelectedSharedOU = useCallback((data) => {
         setSelectedSharedOU_(data)
-    }, [])
-    const setSelectedSharedAttr = useCallback((data) => {
-        setSelectedSharedAttr_(data)
-    }, [])
+    }, []);
     const setSelectedSharedProgram = useCallback((data) => {
         setSelectedSharedProgram_(data)
-    }, [])
-    const setSelectedSharedProgramName = useCallback((data) => {
-        setSelectedSharedProgramName_(data)
-    }, [])
-    const setSelectedSharedOUforQuery = useCallback((data) => {
-        setSelectedSharedOUforQuery_(data)
-    }, [])
-    const setFullOrgUnitSharedSearch = useCallback((data) => {
-        setFullOrgUnitSharedSearch_(data)
-    }, [])
-    const setPersistSharedData = useCallback((data) => {
-        setPersistSharedData_(data)
-    }, [])
+    }, []);
+    const setSelectedSharedOrgUnit = useCallback((data) => {
+        setSelectedSharedOrgUnit_(data)
+    }, []);
 
 
     return {
         selectedSharedOU,
         setSelectedSharedOU,
-        selectedSharedAttr,
-        setSelectedSharedAttr,
         selectedSharedProgram,
         setSelectedSharedProgram,
-        fullOrgUnitSharedSearch,
-        setFullOrgUnitSharedSearch,
-        selectedSharedProgramName,
-        setSelectedSharedProgramName,
-        selectedOUSharedforQuery,
-        setSelectedSharedOUforQuery,
-        persistSharedData,
-        setPersistSharedData
+        selectedSharedOrgUnit,
+        setSelectedSharedOrgUnit
     }
 }
 
