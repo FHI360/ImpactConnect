@@ -44,6 +44,7 @@ export const Main = () => {
     const [configuredStages, setConfiguredStages] = useState({});
     const [entityAttributes, setEntityAttributes] = useState([]);
     const [attributeOptions, setAttributeOptions] = useState({});
+    const [edits, setEdits] = useState([]);
 
     const dataStoreQuery = {
         dataStore: {
@@ -300,8 +301,18 @@ export const Main = () => {
 
     const dataElementValue = (dataElement, entity) => {
         const event = entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
+        const editedEntity = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity)
         if (event) {
-            return event.dataValues.find(dv => dv.dataElement === dataElement)?.value;
+            let value;
+            if (editedEntity) {
+                value = editedEntity.value;
+            } else {
+                value = event.dataValues.find(dv => dv.dataElement === dataElement)?.value;
+            }
+            return value;
+
+        } else if (editedEntity) {
+            return editedEntity.value;
         }
         return null;
     }
@@ -331,6 +342,88 @@ export const Main = () => {
         }
         dates[date] = entities;
         setDateEntities(dates);
+    }
+
+    const saveEdits = () => {
+        const events = [];
+        console.log('Edits', edits)
+        edits.forEach(edit => {
+            let event = edit.entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
+            if (!event) {
+                event = {
+                    programStage: selectedStage,
+                    enrollment: edit.entity.enrollments[0].enrollment,
+                    trackedEntity: edit.entity.trackedEntity,
+                    orgUnit: edit.entity.orgUnit,
+                    occurredAt: edit.date.toISOString(),
+                    dataValues: []
+                }
+            }
+            const dataValue = event.dataValues.find(dv => dv.dataElement === edit.dataElement.id) || {};
+            dataValue.dataElement = edit.dataElement.id;
+            dataValue.value = (edit.value ?? '') + '';
+            if (edit.dataElement.valueType === 'TRUE_ONLY' && !edit.value) {
+                dataValue.value = null;
+            }
+
+            const dataValues = event.dataValues.filter(dv => dv.dataElement !== edit.dataElement) || [];
+            dataValues.push(dataValue);
+            event.dataValues = dataValues;
+
+            events.push(event);
+        })
+
+        engine.mutate({
+            resource: 'tracker',
+            type: 'create',
+            params: {
+                async: false
+            },
+            data: {
+                events
+            }
+        }).then((response) => {
+            if (response.status === 'OK') {
+                setEdits([]);
+                refetch({
+                    program: selectedProgram,
+                    orgUnit: orgUnit,
+                    page,
+                    pageSize
+                })
+            }
+        });
+    }
+
+    // eslint-disable-next-line max-params
+    const createOrUpdateEvent = (entity, date, dataElement, value) => {
+        if (dataElement.valueType.includes('INTEGER')) {
+            if (!Number.isInteger(value)) {
+                alert('Please enter a valid integer number');
+                return;
+            }
+            if (dataElement.valueType === 'INTEGER_ZERO_OR_POSITIVE' && parseInt(value) < 0) {
+                alert('Please enter a non-negative integer');
+                return;
+            }
+            if (dataElement.valueType === 'INTEGER_POSITIVE' && parseInt(value) <= 0) {
+                alert('Please enter a number greater than 0');
+                return;
+            }
+            if (dataElement.valueType === 'INTEGER_NEGATIVE' && parseInt(value) >= 0) {
+                alert('Please enter a number less than 0');
+                return;
+            }
+        }
+        const _edits = edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity);
+        _edits.push({
+            entity,
+            date,
+            dataElement,
+            value
+        });
+        console.log(_edits);
+        setEdits(_edits);
     }
 
     return (
@@ -421,7 +514,7 @@ export const Main = () => {
                                                         </div>
                                                     </>
                                                 } else {
-                                                    if (attr.valueType === 'TRUE_ONLY') {
+                                                    if (attr.valueType === 'TRUE_ONLY' || attr.valueType === 'BOOLEAN') {
                                                         return <>
                                                             <div
                                                                 className="flex items-center mb-2">
@@ -436,7 +529,7 @@ export const Main = () => {
                                                             </div>
                                                         </>
                                                     }
-                                                    if (attr.valueType === 'INTEGER_ZERO_OR_POSITIVE') {
+                                                    if (attr.valueType.includes('INTEGER') || attr.valueType === 'NUMBER') {
                                                         return <>
                                                             <div
                                                                 className="mb-2">
@@ -451,7 +544,7 @@ export const Main = () => {
                                                             </div>
                                                         </>
                                                     }
-                                                    if (attr.valueType === 'TEXT') {
+                                                    if (attr.valueType.includes('TEXT')) {
                                                         return <>
                                                             <div
                                                                 className="mb-2">
@@ -503,6 +596,14 @@ export const Main = () => {
                                                         <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
 
                                                         </p>
+                                                        <div className="flex flex-row justify-end">
+                                                            {edits.length !== 0 &&
+                                                                <button type="button"
+                                                                        className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                        onClick={saveEdits}>Save Records
+                                                                </button>
+                                                            }
+                                                        </div>
                                                     </caption>
                                                     <thead
                                                         className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -532,7 +633,7 @@ export const Main = () => {
                                                             return <th key={idx}
                                                                        className="px-6 py-3">
                                                                 <div className="flex flex-row gap-1">
-                                                                    <div
+                                                                    {/*<div
                                                                         className="flex items-center mb-4">
                                                                         <input
                                                                             type="checkbox"
@@ -541,7 +642,7 @@ export const Main = () => {
                                                                                 selectDate(date, event.target.checked)
                                                                             }}
                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                    </div>
+                                                                    </div>*/}
                                                                     {formDate(date)}
                                                                 </div>
                                                             </th>
@@ -567,7 +668,7 @@ export const Main = () => {
                                                                     return <>
                                                                         <td key={idx} className="px-6 py-4">
                                                                             <div className="flex flex-row">
-                                                                                <div
+                                                                                {/* <div
                                                                                     className="w-1/12 flex flex-col">
                                                                                     <div
                                                                                         className="flex items-center mb-4">
@@ -579,20 +680,21 @@ export const Main = () => {
                                                                                             }}
                                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                                                     </div>
-                                                                                </div>
+                                                                                </div>*/}
                                                                                 <div
                                                                                     className="w-11/12 flex flex-col">
                                                                                     <div
                                                                                         className="flex flex-col gap-1">
                                                                                         {dataElements.map(de => {
                                                                                             const configuredDataElements = configuredStages[selectedStage] || [];
-                                                                                            if (de.valueType === 'TRUE_ONLY' && configuredDataElements.includes(de.id)) {
+                                                                                            if ((de.valueType === 'TRUE_ONLY' || de.valueType === 'BOOLEAN') && configuredDataElements.includes(de.id)) {
                                                                                                 return <>
                                                                                                     <div
                                                                                                         className="flex items-center mb-4">
                                                                                                         <input
                                                                                                             type="checkbox"
                                                                                                             checked={dataElementValue(de.id, entity) === 'true'}
+                                                                                                            onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.checked)}
                                                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                                                                         <label
                                                                                                             className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
@@ -601,7 +703,7 @@ export const Main = () => {
                                                                                                     </div>
                                                                                                 </>
                                                                                             }
-                                                                                            if (de.valueType === 'INTEGER_ZERO_OR_POSITIVE' && configuredDataElements.includes(de.id)) {
+                                                                                            if ((de.valueType.includes('INTEGER') || de.valueType === 'NUMBER') && configuredDataElements.includes(de.id)) {
                                                                                                 return <>
                                                                                                     <div
                                                                                                         className="mb-5">
@@ -612,6 +714,23 @@ export const Main = () => {
                                                                                                         <input
                                                                                                             type="number"
                                                                                                             value={dataElementValue(de.id, entity)}
+                                                                                                            onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.value)}
+                                                                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
+                                                                                                    </div>
+                                                                                                </>
+                                                                                            }
+                                                                                            if (de.valueType.includes('TEXT') && configuredDataElements.includes(de.id)) {
+                                                                                                return <>
+                                                                                                    <div
+                                                                                                        className="mb-5">
+                                                                                                        <label
+                                                                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                                                            {de.name}
+                                                                                                        </label>
+                                                                                                        <input
+                                                                                                            type="text"
+                                                                                                            value={dataElementValue(de.id, entity)}
+                                                                                                            onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.value)}
                                                                                                             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
                                                                                                     </div>
                                                                                                 </>

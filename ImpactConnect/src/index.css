@@ -116,6 +116,9 @@
 .items-center {
     align-items: center
 }
+.justify-end {
+    justify-content: flex-end
+}
 .justify-center {
     justify-content: center
 }
@@ -167,10 +170,6 @@
 .border-b-gray-800 {
     --tw-border-opacity: 1;
     border-bottom-color: rgb(31 41 55 / var(--tw-border-opacity))
-}
-.bg-\[\#2557D6\] {
-    --tw-bg-opacity: 1;
-    background-color: rgb(37 87 214 / var(--tw-bg-opacity))
 }
 .bg-\[\#f8f4f3\] {
     --tw-bg-opacity: 1;
