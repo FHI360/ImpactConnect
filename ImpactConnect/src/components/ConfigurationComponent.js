@@ -32,6 +32,7 @@ const ConfigurationComponent = () => {
     const [dataElements, setDataElements] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
     const [selectedDataElements, setSelectedDataElements] = useState([]);
+    const [endDateVisible, setEndDateVisible] = useState(false);
     const [editing, setEditing] = useState(false);
     const [stages, setStages] = useState([]);
 
@@ -130,6 +131,7 @@ const ConfigurationComponent = () => {
                 setNameAttributes(entry.value.nameAttributes || []);
                 setFilterAttributes(entry.value.filterAttributes || []);
                 setConfiguredStages(entry.value.configuredStages || {})
+                setEndDateVisible(entry.value.endDateVisible)
                 const exists = keyExists;
                 exists[selectedProgram] = true;
                 setKeyExists(exists);
@@ -158,7 +160,8 @@ const ConfigurationComponent = () => {
         const value = {
             nameAttributes,
             filterAttributes,
-            configuredStages
+            configuredStages,
+            endDateVisible
         }
         value[type] = data;
         const mutation = {
@@ -228,6 +231,23 @@ const ConfigurationComponent = () => {
                                           }}
                                           enableOrderChange
                                 />
+                            </div>
+                            <div className="shadow-sm rounded-md p-3 bg-white mb-2">
+                                <div
+                                    className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={endDateVisible === true}
+                                        onChange={(payload) => {
+                                            setEndDateVisible(payload.target.checked);
+                                            dataStoreOperation('endDateVisible', payload.target.checked);
+                                        }}
+                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                    <label
+                                        className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                        {i18n.t('End Date Visible?')}
+                                    </label>
+                                </div>
                             </div>
                             <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
                                 <label htmlFor="program"
