@@ -369,6 +369,9 @@ export const Main = () => {
                 if (edit.dataElement.valueType === 'TRUE_ONLY' && !edit.value) {
                     dataValue.value = null;
                 }
+                if (edit.dataElement.valueType.includes('DATE')) {
+                    dataValue.value = edit.value ? edit.value.toISOString() : '';
+                }
 
                 const dataValues = event.dataValues.filter(dv => dv.dataElement !== value.dataElement.id) || [];
                 dataValues.push(dataValue);
@@ -450,7 +453,6 @@ export const Main = () => {
             })
             return equals;
         }
-        console.log('Original', originalEdit, currentEdit);
         if (originalEdit?.entity.trackedEntity !== currentEdit.entity.trackedEntity ||
             !mappedValuesEquals(mappedValues(originalEdit), mappedValues(currentEdit))) {
             _edits.push(currentEdit);
@@ -602,6 +604,21 @@ export const Main = () => {
                                                                     onChange={(event) => filterEntities(attr, event.target.value)}
                                                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
                                                             </div>
+                                                        </>
+                                                    }
+                                                    if (attr.valueType.includes('DATE')) {
+                                                        return <>
+                                                        <div className="mb-2">
+                                                            <label
+                                                                className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                {entityAttributes.find(a => a.id === attr)?.displayName}
+                                                            </label>
+                                                            <CalendarInput
+                                                                label="Event start date"
+                                                                calendar="gregory"
+                                                                onDateSelect={(event) => filterEntities(attr, new Date(event.calendarDateString).toISOString())}
+                                                            />
+                                                        </div>
                                                         </>
                                                     }
                                                 }
@@ -777,6 +794,23 @@ export const Main = () => {
                                                                                                             value={dataElementValue(de.id, entity)}
                                                                                                             onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.value)}
                                                                                                             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
+                                                                                                    </div>
+                                                                                                </>
+                                                                                            }
+                                                                                            if (de.valueType.includes('DATE') && configuredDataElements.includes(de.id)) {
+                                                                                                return <>
+                                                                                                    <div
+                                                                                                        className="mb-5">
+                                                                                                        <label
+                                                                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                                                            {de.name}
+                                                                                                        </label>
+                                                                                                        <CalendarInput
+                                                                                                            label="Event start date"
+                                                                                                            calendar="gregory"
+                                                                                                            date={dataElementValue(de.id, entity)}
+                                                                                                            onDateSelect={(event) => createOrUpdateEvent(entity, date, de, new Date(event.calendarDateString).toISOString())}
+                                                                                                        />
                                                                                                     </div>
                                                                                                 </>
                                                                                             }
