@@ -45,6 +45,7 @@ export const Main = () => {
     const [entityAttributes, setEntityAttributes] = useState([]);
     const [attributeOptions, setAttributeOptions] = useState({});
     const [edits, setEdits] = useState([]);
+    const [originalEdits, setOriginalEdits] = useState([]);
 
     const dataStoreQuery = {
         dataStore: {
@@ -172,6 +173,8 @@ export const Main = () => {
             const dataElements = elementsData.programStage.programStageDataElements.map(data => data.dataElement);
             setDataElements(dataElements);
         }
+        setOriginalEdits([]);
+        setEdits([]);
     }, [elementsData, selectedStage]);
 
     useEffect(() => {
@@ -302,17 +305,18 @@ export const Main = () => {
     const dataElementValue = (dataElement, entity) => {
         const event = entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
         const editedEntity = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity)
+
         if (event) {
             let value;
             if (editedEntity) {
-                value = editedEntity.value;
+                value = editedEntity.values.find(value => value.dataElement.id === dataElement)?.value;
             } else {
                 value = event.dataValues.find(dv => dv.dataElement === dataElement)?.value;
             }
-            return value;
+            return (value ?? '') + '';
 
         } else if (editedEntity) {
-            return editedEntity.value;
+            return (editedEntity.values.find(value => value.dataElement.id === dataElement)?.value ?? '') + '';
         }
         return null;
     }
@@ -346,7 +350,6 @@ export const Main = () => {
 
     const saveEdits = () => {
         const events = [];
-        console.log('Edits', edits)
         edits.forEach(edit => {
             let event = edit.entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
             if (!event) {
@@ -359,16 +362,18 @@ export const Main = () => {
                     dataValues: []
                 }
             }
-            const dataValue = event.dataValues.find(dv => dv.dataElement === edit.dataElement.id) || {};
-            dataValue.dataElement = edit.dataElement.id;
-            dataValue.value = (edit.value ?? '') + '';
-            if (edit.dataElement.valueType === 'TRUE_ONLY' && !edit.value) {
-                dataValue.value = null;
-            }
+            edit.values.forEach(value => {
+                const dataValue = event.dataValues.find(dv => dv.dataElement === value.dataElement.id) || {};
+                dataValue.dataElement = edit.dataElement.id;
+                dataValue.value = (edit.value ?? '') + '';
+                if (edit.dataElement.valueType === 'TRUE_ONLY' && !edit.value) {
+                    dataValue.value = null;
+                }
 
-            const dataValues = event.dataValues.filter(dv => dv.dataElement !== edit.dataElement) || [];
-            dataValues.push(dataValue);
-            event.dataValues = dataValues;
+                const dataValues = event.dataValues.filter(dv => dv.dataElement !== value.dataElement.id) || [];
+                dataValues.push(dataValue);
+                event.dataValues = dataValues;
+            });
 
             events.push(event);
         })
@@ -398,10 +403,7 @@ export const Main = () => {
     // eslint-disable-next-line max-params
     const createOrUpdateEvent = (entity, date, dataElement, value) => {
         if (dataElement.valueType.includes('INTEGER')) {
-            if (!Number.isInteger(value)) {
-                alert('Please enter a valid integer number');
-                return;
-            }
+            value = parseInt(value);
             if (dataElement.valueType === 'INTEGER_ZERO_OR_POSITIVE' && parseInt(value) < 0) {
                 alert('Please enter a non-negative integer');
                 return;
@@ -416,13 +418,56 @@ export const Main = () => {
             }
         }
         const _edits = edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity);
-        _edits.push({
-            entity,
-            date,
+        let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
+        const originalEdit = originalEdits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
+        if (!currentEdit) {
+            currentEdit = {
+                entity,
+                values: []
+            };
+        }
+        const values = currentEdit.values.filter(v => v.dataElement.id !== dataElement.id);
+        values.push({
+            value,
             dataElement,
-            value
+            date
         });
-        console.log(_edits);
+        currentEdit.values = values;
+
+        const mappedValues = (entity) => {
+            return entity.values.map(v => {
+                return {
+                    value: v.value,
+                    dataElement: v.dataElement.id,
+                }
+            });
+        }
+        const mappedValuesEquals = (values2, values1) => {
+            let equals = false;
+            values1.forEach(v => {
+                const corr = values2.find(v2 => v2.dataElement === v.dataElement);
+                equals = corr?.value === v.value;
+            })
+            return equals;
+        }
+        console.log('Original', originalEdit, currentEdit);
+        if (originalEdit?.entity.trackedEntity !== currentEdit.entity.trackedEntity ||
+            !mappedValuesEquals(mappedValues(originalEdit), mappedValues(currentEdit))) {
+            _edits.push(currentEdit);
+
+            if (!originalEdit) {
+                setOriginalEdits([...originalEdits, currentEdit]);
+            } else {
+                const _originalEdits = originalEdits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity);
+                const oldValues = originalEdit.values.filter(v => v.dataElement.id === dataElement.id);
+                const newValues = currentEdit.values.filter(v => v.dataElement.id !== dataElement.id);
+                oldValues.push(...newValues);
+                originalEdit.values = oldValues;
+
+                setOriginalEdits([..._originalEdits, originalEdit]);
+            }
+        }
+
         setEdits(_edits);
     }
 
