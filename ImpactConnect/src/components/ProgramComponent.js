@@ -1,7 +1,6 @@
 import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n';
-import React, { useContext } from 'react'
-import { SharedStateContext } from '../utils';
+import React from 'react'
 
 /*  Query Parameters**/
 const query = {
