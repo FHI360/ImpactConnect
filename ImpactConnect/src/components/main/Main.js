@@ -44,6 +44,7 @@ export const Main = () => {
     const [configuredStages, setConfiguredStages] = useState({});
     const [entityAttributes, setEntityAttributes] = useState([]);
     const [attributeOptions, setAttributeOptions] = useState({});
+    const [endDateVisible, setEndDateVisible] = useState(false);
     const [edits, setEdits] = useState([]);
     const [originalEdits, setOriginalEdits] = useState([]);
 
@@ -143,7 +144,8 @@ export const Main = () => {
             if (entry) {
                 setNameAttributes(entry.value.nameAttributes || []);
                 setFilterAttributes(entry.value.filterAttributes || []);
-                setConfiguredStages(entry.value.configuredStages || {})
+                setConfiguredStages(entry.value.configuredStages || {});
+                setEndDateVisible(entry.value.endDateVisible);
             }
         }
     }, [dataStore, selectedProgram]);
@@ -608,17 +610,17 @@ export const Main = () => {
                                                     }
                                                     if (attr.valueType.includes('DATE')) {
                                                         return <>
-                                                        <div className="mb-2">
-                                                            <label
-                                                                className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                            </label>
-                                                            <CalendarInput
-                                                                label="Event start date"
-                                                                calendar="gregory"
-                                                                onDateSelect={(event) => filterEntities(attr, new Date(event.calendarDateString).toISOString())}
-                                                            />
-                                                        </div>
+                                                            <div className="mb-2">
+                                                                <label
+                                                                    className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {entityAttributes.find(a => a.id === attr)?.displayName}
+                                                                </label>
+                                                                <CalendarInput
+                                                                    label=""
+                                                                    calendar="gregory"
+                                                                    onDateSelect={(event) => filterEntities(attr, new Date(event.calendarDateString).toISOString())}
+                                                                />
+                                                            </div>
                                                         </>
                                                     }
                                                 }
@@ -633,19 +635,33 @@ export const Main = () => {
                                 </div>
                                 <div className="flex flex-col w-full mb-2">
                                     <div className="w-3/12 rounded-md bg-white p-3 flex flex-row gap-4">
-                                        <CalendarInput
-                                            label="Event start date"
-                                            calendar="gregory"
-                                            date={startDate.toISOString().slice(0, 10)}
-                                            onDateSelect={stateDateChanged}
-                                        />
-                                        <CalendarInput
-                                            label="Event end date"
-                                            calendar="gregory"
-                                            date={endDate.toISOString().slice(0, 10)}
-                                            max={new Date().toISOString().slice(0, 10)}
-                                            onDateSelect={endDateChanged}
-                                        />
+                                        <div className="flex flex-col">
+                                            <label
+                                                className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                {endDateVisible ? 'Event Start Date' : 'Event Date'}
+                                            </label>
+                                            <CalendarInput
+                                                label=""
+                                                calendar="gregory"
+                                                date={startDate.toISOString().slice(0, 10)}
+                                                onDateSelect={stateDateChanged}
+                                            />
+                                        </div>
+                                        {endDateVisible &&
+                                            <div className="flex flex-col">
+                                                <label
+                                                    className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                    {'Event End Date'}
+                                                </label>
+                                                <CalendarInput
+                                                    label=""
+                                                    calendar="gregory"
+                                                    date={endDate.toISOString().slice(0, 10)}
+                                                    max={new Date().toISOString().slice(0, 10)}
+                                                    onDateSelect={endDateChanged}
+                                                />
+                                            </div>
+                                        }
                                     </div>
                                     <div className="w-full flex flex-col pt-2">
                                         <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
@@ -705,7 +721,7 @@ export const Main = () => {
                                                                             }}
                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                                     </div>*/}
-                                                                    {formDate(date)}
+                                                                    {endDateVisible && formDate(date)}
                                                                 </div>
                                                             </th>
                                                         })}
@@ -800,14 +816,14 @@ export const Main = () => {
                                                                                             if (de.valueType.includes('DATE') && configuredDataElements.includes(de.id)) {
                                                                                                 return <>
                                                                                                     <div
-                                                                                                        className="mb-5">
+                                                                                                        className="mb-5 flex flex-col">
                                                                                                         <label
                                                                                                             className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                                                                                                             {de.name}
                                                                                                         </label>
                                                                                                         <CalendarInput
-                                                                                                            label="Event start date"
                                                                                                             calendar="gregory"
+                                                                                                            label=""
                                                                                                             date={dataElementValue(de.id, entity)}
                                                                                                             onDateSelect={(event) => createOrUpdateEvent(entity, date, de, new Date(event.calendarDateString).toISOString())}
                                                                                                         />
