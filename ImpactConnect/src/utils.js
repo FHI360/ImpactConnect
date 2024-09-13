@@ -331,6 +331,9 @@ export const SharedStateContext = createContext({
     },
     selectedSharedOrgUnit: '',
     setSelectedSharedOrgUnit: () => {
+    },
+    selectedSharedStage: '',
+    setSelectedSharedStage: () => {
     }
 })
 
@@ -338,6 +341,7 @@ export const useSharedState = () => {
     const [selectedSharedOU, setSelectedSharedOU_] = useState([]);
     const [selectedSharedProgram, setSelectedSharedProgram_] = useState('');
     const [selectedSharedOrgUnit, setSelectedSharedOrgUnit_] = useState('');
+    const [selectedSharedStage, setSelectedSharedStage_] = useState('');
 
 
     // memoizedCallbacks
@@ -356,6 +360,9 @@ export const useSharedState = () => {
     const setSelectedSharedOrgUnit = useCallback((data) => {
         setSelectedSharedOrgUnit_(data)
     }, []);
+    const setSelectedSharedStage = useCallback((data) => {
+        setSelectedSharedStage_(data)
+    }, []);
 
 
     return {
@@ -364,7 +371,9 @@ export const useSharedState = () => {
         selectedSharedProgram,
         setSelectedSharedProgram,
         selectedSharedOrgUnit,
-        setSelectedSharedOrgUnit
+        setSelectedSharedOrgUnit,
+        selectedSharedStage,
+        setSelectedSharedStage
     }
 }
 
