@@ -51,6 +51,7 @@ export const Main = () => {
     const [edits, setEdits] = useState([]);
     const [originalEdits, setOriginalEdits] = useState([]);
     const [selectedEntities, setSelectedEntities] = useState([]);
+    const [repeatable, setRepeatable] = useState(false);
 
     const dataStoreQuery = {
         dataStore: {
@@ -91,7 +92,7 @@ export const Main = () => {
             resource: `programStages`,
             id: ({id}) => id,
             params: ({
-                fields: 'programStageDataElements(dataElement(id, name, valueType))'
+                fields: 'repeatable, programStageDataElements(dataElement(id, name, valueType))'
             })
         }
     }
@@ -179,6 +180,7 @@ export const Main = () => {
         if (elementsData && elementsData.programStage && elementsData.programStage.programStageDataElements) {
             const dataElements = elementsData.programStage.programStageDataElements.map(data => data.dataElement);
             setDataElements(dataElements);
+            setRepeatable(elementsData.programStage.repeatable);
         }
         setOriginalEdits([]);
         setEdits([]);
@@ -376,13 +378,18 @@ export const Main = () => {
                     formatDate(event.occurredAt) === eventDate);
                 const values = filterValues(edit.values, eventDate);
                 if (!event) {
-                    event = {
-                        programStage: selectedStage,
-                        enrollment: edit.entity.enrollments[0].enrollment,
-                        trackedEntity: edit.entity.trackedEntity,
-                        orgUnit: edit.entity.orgUnit,
-                        occurredAt: values[0].date.toISOString(),
-                        dataValues: []
+                    const existingEvent = edit.entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
+                    if (existingEvent && !repeatable) {
+                        event = existingEvent;
+                    } else {
+                        event = {
+                            programStage: selectedStage,
+                            enrollment: edit.entity.enrollments[0].enrollment,
+                            trackedEntity: edit.entity.trackedEntity,
+                            orgUnit: edit.entity.orgUnit,
+                            occurredAt: values[0].date.toISOString(),
+                            dataValues: []
+                        }
                     }
                 }
 
@@ -582,7 +589,7 @@ export const Main = () => {
                                                 setSelectedStage={(stage) => {
                                                     setSelectedStage(stage)
                                                     setSelectedSharedStage(stage)
-                                                    }
+                                                }
                                                 }
                                             />
                                         </div>
@@ -721,7 +728,7 @@ export const Main = () => {
                                                 onDateSelect={stateDateChanged}
                                             />
                                         </div>
-                                        {endDateVisible &&
+                                        {endDateVisible && repeatable &&
                                             <div className="w-3/12 flex flex-col">
                                                 <label
                                                     className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
