@@ -1,3 +1,4 @@
+import classnames from 'classnames';
 import React from 'react'
 import { Link, useMatch, useNavigate, } from 'react-router-dom';
 
@@ -12,13 +13,16 @@ function NavigationItem({to, children, ...props}) {
     // path is matched if routeMatch is not null ${isActive ? "active" : ""}  customLinkActive
     const isActive = Boolean(routeMatch)
     const onClick = () => navigate(to)
-    // console.log({children})
-    // console.log({...props})
+    const classess = classnames({
+            'block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 md:hover:bg-transparent md:hover:text-blue-700 md:p-0 md:dark:hover:text-blue-500 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent dark:border-gray-700': !isActive
+        },
+        {'block py-2 px-3 text-white bg-blue-700 rounded md:bg-transparent md:text-blue-700 md:p-0 md:dark:text-blue-500': isActive}
+    )
 
     return (
         <button type="button"
                 onClick={onClick}
-                className="inline-flex flex-col items-center justify-center px-5 hover:bg-gray-50 dark:hover:bg-gray-800 group">
+                className={classess}>
             <Link to={to} {...props}>
                 {children}
             </Link>
@@ -26,15 +30,18 @@ function NavigationItem({to, children, ...props}) {
     )
 }
 
-export const Navigation = () => (
-    <div
-        className="relative top-0 left-0 z-50 w-full h-16 bg-white border-t border-gray-200 dark:bg-gray-700 dark:border-gray-600">
-        <div className="grid h-full max-w-lg grid-cols-4 mx-auto font-medium">
-            <NavigationItem to="/">
-                <span
-                    className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-500">Home</span>
-            </NavigationItem>
-            <NavigationItem to="/configure">Configuration</NavigationItem>
+export const Navigation = () => {
+    return <>
+        <div
+            className="relative top-0 left-0 z-50 w-full h-16 bg-white border-t border-gray-200 dark:bg-gray-700 dark:border-gray-600">
+            <div className="grid h-full max-w-lg grid-cols-4 mx-auto font-medium">
+                <NavigationItem to="/">
+                    <span>Home</span>
+                </NavigationItem>
+                <NavigationItem to="/configure">
+                    <span>Configuration</span>
+                </NavigationItem>
+            </div>
         </div>
-    </div>
-)
+    </>
+}

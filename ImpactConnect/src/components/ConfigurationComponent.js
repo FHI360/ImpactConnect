@@ -32,10 +32,13 @@ const ConfigurationComponent = () => {
     const [dataElements, setDataElements] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
     const [selectedDataElements, setSelectedDataElements] = useState([]);
+    const [selectedIndividualDataElements, setSelectedIndividualDataElements] = useState([]);
     const [endDateVisible, setEndDateVisible] = useState(false);
     const [groupEdit, setGroupEdit] = useState(false);
     const [editing, setEditing] = useState(false);
+    const [editing1, setEditing1] = useState(false);
     const [stages, setStages] = useState([]);
+    const [columnDisplay, setColumnDisplay] = useState(false);
 
     const engine = useDataEngine();
 
@@ -131,9 +134,13 @@ const ConfigurationComponent = () => {
             if (entry) {
                 setNameAttributes(entry.value.nameAttributes || []);
                 setFilterAttributes(entry.value.filterAttributes || []);
-                setConfiguredStages(entry.value.configuredStages || {})
+                setConfiguredStages(entry.value.configuredStages || {
+                    dataElements: [],
+                    individualDataElements: []
+                })
                 setEndDateVisible(entry.value.endDateVisible)
                 setGroupEdit(entry.value.groupEdit);
+                setColumnDisplay(entry.value.columnDisplay);
                 const exists = keyExists;
                 exists[selectedProgram] = true;
                 setKeyExists(exists);
@@ -155,7 +162,8 @@ const ConfigurationComponent = () => {
         setSelectedProgram(event);
         setSelectedSharedProgram(event);
         setConfiguredStages({});
-        setSelectedDataElements([])
+        setSelectedDataElements([]);
+        setSelectedIndividualDataElements([])
     }
 
     const dataStoreOperation = (type, data) => {
@@ -164,7 +172,8 @@ const ConfigurationComponent = () => {
             filterAttributes,
             configuredStages,
             endDateVisible,
-            groupEdit
+            groupEdit,
+            columnDisplay
         }
         value[type] = data;
         const mutation = {
@@ -269,10 +278,27 @@ const ConfigurationComponent = () => {
                                     </label>
                                 </div>
                             </div>
-                            <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
+                            <div className="shadow-sm rounded-md p-3 bg-white mb-2">
+                                <div
+                                    className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={columnDisplay === true}
+                                        onChange={(payload) => {
+                                            setColumnDisplay(payload.target.checked);
+                                            dataStoreOperation('columnDisplay', payload.target.checked);
+                                        }}
+                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                    <label
+                                        className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                        {i18n.t('Display Data Elements as columns in table?')}
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white mb-2">
                                 <label htmlFor="program"
                                        className="block mb-2 text-sm font-semibold text-gray-900 dark:text-white">
-                                    {i18n.t('Configure Data Elements')}
+                                    {i18n.t(groupEdit ? 'Configure Group Action Data Elements' : 'Configure Data Elements')}
                                 </label>
                                 <div className="shadow-md rounded-md p-4 bg-white mb-4">
                                     <label htmlFor="program"
@@ -280,7 +306,7 @@ const ConfigurationComponent = () => {
                                         {i18n.t('Configured Stages')}
                                     </label>
                                     <div className="w-full flex flex-col">
-                                        {Object.keys(configuredStages).map((stage, index) => {
+                                        {Object.keys(configuredStages).map((stage) => {
                                             return <>
                                                 <div className="border-b p-2 bg-gray-100 w-full flex flex-row">
                                                     <div className="w-7/12">
@@ -291,7 +317,7 @@ const ConfigurationComponent = () => {
                                                                 className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
                                                                 onClick={() => {
                                                                     setEditing(true)
-                                                                    setSelectedDataElements(configuredStages[stage])
+                                                                    setSelectedDataElements(configuredStages[stage]['dataElements'] || [])
                                                                     setSelectedStage(stage)
                                                                 }}>Edit stage
                                                         </button>
@@ -360,7 +386,7 @@ const ConfigurationComponent = () => {
                                                                             setSelectedDataElements([])
                                                                         }
                                                                     }}
-                                                                    checked={selectedDataElements.length === dataElements.length}
+                                                                    checked={selectedDataElements?.length === dataElements.length}
                                                                     className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                             </div>
                                                         </th>
@@ -379,10 +405,11 @@ const ConfigurationComponent = () => {
                                                                         className="flex items-center mb-4">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={selectedDataElements.includes(dataElement.id)}
+                                                                            checked={selectedDataElements?.includes(dataElement.id)}
                                                                             onChange={() => {
-                                                                                if (selectedDataElements.includes(dataElement.id)) {
-                                                                                    setSelectedDataElements(selectedDataElements.filter(rowId => rowId !== dataElement.id));
+                                                                                console.log('selectedDataElements', selectedDataElements)
+                                                                                if (selectedDataElements?.includes(dataElement.id)) {
+                                                                                    setSelectedDataElements(selectedDataElements?.filter(rowId => rowId !== dataElement.id));
                                                                                 } else {
                                                                                     setSelectedDataElements([...selectedDataElements, dataElement.id]);
                                                                                 }
@@ -399,12 +426,15 @@ const ConfigurationComponent = () => {
                                                     <tfoot>
                                                     <tr className="font-semibold text-gray-900 dark:text-white">
                                                         <th scope="row" className="px-6 py-3 text-base">
-                                                            {selectedDataElements.length &&
+                                                            {selectedDataElements?.length > 0 &&
                                                                 <button type="button"
                                                                         className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
                                                                         onClick={() => {
                                                                             const stages = configuredStages
-                                                                            stages[selectedStage] = selectedDataElements;
+                                                                            stages[selectedStage] = {
+                                                                                'dataElements': selectedDataElements,
+                                                                                individualDataElements: stages[selectedStage]['individualDataElements']
+                                                                            };
                                                                             setConfiguredStages(stages);
                                                                             setEditing(false);
                                                                             setSelectedStage('');
@@ -418,7 +448,10 @@ const ConfigurationComponent = () => {
                                                                         className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
                                                                         onClick={() => {
                                                                             const stages = configuredStages
-                                                                            delete stages[selectedStage]
+                                                                            delete stages[selectedStage]['dataElements'];
+                                                                            if (!stages[selectedStage]['individualDataElements']) {
+                                                                                delete stages[selectedStage]
+                                                                            }
                                                                             setConfiguredStages(stages);
                                                                             setEditing(false);
                                                                             setSelectedStage('');
@@ -436,6 +469,185 @@ const ConfigurationComponent = () => {
                                     </div>
                                 }
                             </div>
+                            {groupEdit &&
+                                <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
+                                    <label htmlFor="program"
+                                           className="block mb-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                        {i18n.t('Configure Individual Data Elements')}
+                                    </label>
+                                    <div className="shadow-md rounded-md p-4 bg-white mb-4">
+                                        <label htmlFor="program"
+                                               className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                            {i18n.t('Configured Stages')}
+                                        </label>
+                                        <div className="w-full flex flex-col">
+                                            {Object.keys(configuredStages).map((stage) => {
+                                                return <>
+                                                    <div className="border-b p-2 bg-gray-100 w-full flex flex-row">
+                                                        <div className="w-7/12">
+                                                            {stages.find(s => s.id === stage)?.displayName}
+                                                        </div>
+                                                        <div className="w-5/12 flex-row flex">
+                                                            <button type="button"
+                                                                    className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                    onClick={() => {
+                                                                        setEditing1(true)
+                                                                        setSelectedIndividualDataElements(configuredStages[stage]['individualDataElements'] || [])
+                                                                        setSelectedStage(stage)
+                                                                    }}>Edit stage
+                                                            </button>
+                                                            <button type="button"
+                                                                    className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
+                                                                    onClick={() => {
+                                                                        const stages = configuredStages
+                                                                        delete stages[selectedStage]['dataElements'];
+                                                                        if (!stages[selectedStage]['individualDataElements']) {
+                                                                            delete stages[selectedStage]
+                                                                        }
+                                                                        setConfiguredStages(stages);
+                                                                        setEditing1(false);
+                                                                        setSelectedStage('');
+
+                                                                        dataStoreOperation('configuredStages', stages);
+                                                                    }}>Delete stage
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            })
+                                            }
+                                        </div>
+                                    </div>
+                                    <div className="w-3/12 flex flex-col">
+                                        <div>
+                                            <ProgramStageComponent
+                                                selectedProgram={selectedProgram}
+                                                selectedStage={selectedStage}
+                                                setSelectedStage={(selection) => {
+                                                    setSelectedStage(selection);
+                                                    if (selection) {
+                                                        setEditing1(true)
+                                                        setSelectedDataElements([]);
+                                                        setSelectedIndividualDataElements([]);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    {editing1 &&
+                                        <div className="w-full flex flex-col pt-2">
+                                            <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
+                                                <div
+                                                    className="relative overflow-x-auto shadow-md sm:rounded-lg">
+                                                    <table
+                                                        className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                                        <caption
+                                                            className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
+                                                            Data Elements
+                                                            <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                                                Select data Elements the will be visible for the
+                                                                selected stage when
+                                                                attending to participants
+                                                            </p>
+                                                        </caption>
+                                                        <thead
+                                                            className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                        <tr>
+                                                            <th rowSpan={2} className="px-6 py-6">
+                                                                <div
+                                                                    className="flex items-center mb-4">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        onChange={(event) => {
+                                                                            if (event.target.checked) {
+                                                                                setSelectedIndividualDataElements(dataElements.map(de => de.id))
+                                                                            } else {
+                                                                                setSelectedIndividualDataElements([])
+                                                                            }
+                                                                        }}
+                                                                        checked={selectedIndividualDataElements?.length === dataElements.length}
+                                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                                                </div>
+                                                            </th>
+                                                            <th data-priority="1" className="px-6 py-3">#</th>
+                                                            <th data-priority="2" className="px-6 py-3">
+                                                                Data Element
+                                                            </th>
+                                                        </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                        {dataElements.map((dataElement, index) => {
+                                                            return <>
+                                                                <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                                                                    <td className="px-6 py-6">
+                                                                        <div
+                                                                            className="flex items-center mb-4">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={selectedIndividualDataElements?.includes(dataElement.id)}
+                                                                                onChange={() => {
+                                                                                    if (selectedIndividualDataElements?.includes(dataElement.id)) {
+                                                                                        setSelectedIndividualDataElements(selectedIndividualDataElements?.filter(rowId => rowId !== dataElement.id));
+                                                                                    } else {
+                                                                                        setSelectedIndividualDataElements([...selectedIndividualDataElements, dataElement.id]);
+                                                                                    }
+                                                                                }}
+                                                                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>{index + 1}</td>
+                                                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{dataElement.name}</td>
+                                                                </tr>
+                                                            </>
+                                                        })}
+                                                        </tbody>
+                                                        <tfoot>
+                                                        <tr className="font-semibold text-gray-900 dark:text-white">
+                                                            <th scope="row" className="px-6 py-3 text-base">
+                                                                {selectedIndividualDataElements?.length > 0 &&
+                                                                    <button type="button"
+                                                                            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                            onClick={() => {
+                                                                                const stages = configuredStages
+                                                                                stages[selectedStage] = {
+                                                                                    'individualDataElements': selectedIndividualDataElements,
+                                                                                    dataElements: stages[selectedStage]['dataElements']
+                                                                                };
+                                                                                setConfiguredStages(stages);
+                                                                                setEditing1(false);
+                                                                                setSelectedStage('');
+
+                                                                                dataStoreOperation('configuredStages', stages);
+                                                                            }}>Save stage
+                                                                    </button>
+                                                                }
+                                                                {configuredStages[selectedStage] &&
+                                                                    <button type="button"
+                                                                            className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
+                                                                            onClick={() => {
+                                                                                const stages = configuredStages;
+                                                                                delete stages[selectedStage]['individualDataElements'];
+                                                                                if (!stages[selectedStage]['dataElements']) {
+                                                                                    delete stages[selectedStage]
+                                                                                }
+                                                                                setConfiguredStages(stages);
+                                                                                setEditing1(false);
+                                                                                setSelectedStage('');
+
+                                                                                dataStoreOperation('configuredStages', stages);
+                                                                            }}>Delete stage
+                                                                    </button>
+                                                                }
+                                                            </th>
+                                                        </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
                 </div>
