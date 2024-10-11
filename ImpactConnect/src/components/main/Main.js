@@ -5,11 +5,11 @@ import classnames from 'classnames';
 import React, { useContext, useEffect, useState } from 'react';
 import { config, MainTitle } from '../../consts.js';
 import { provisionOUs, SharedStateContext } from '../../utils.js';
+import { DataElementComponent } from '../DataElement.js';
 import { Navigation } from '../Navigation.js';
 import OrganisationUnitComponent from '../OrganisationUnitComponent.js';
 import ProgramComponent from '../ProgramComponent.js';
 import ProgramStageComponent from '../ProgramStageComponent.js';
-import { DataElementComponent } from '../DataElement';
 
 export const Main = () => {
     const engine = useDataEngine();
@@ -512,8 +512,8 @@ export const Main = () => {
                 events.push(event);
             });
         });
-        console.log('Events', events)
-        /*engine.mutate({
+
+        engine.mutate({
             resource: 'tracker',
             type: 'create',
             params: {
@@ -535,7 +535,7 @@ export const Main = () => {
             } else {
                 show({msg: i18n.t('There was an error updating records'), type: 'error'});
             }
-        });*/
+        });
     }
 
     // eslint-disable-next-line max-params
