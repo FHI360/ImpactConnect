@@ -1,4 +1,4 @@
-import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
+import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { CalendarInput, Modal, ModalActions, ModalContent, ModalTitle } from '@dhis2/ui';
 import classnames from 'classnames';
@@ -9,6 +9,7 @@ import { Navigation } from '../Navigation.js';
 import OrganisationUnitComponent from '../OrganisationUnitComponent.js';
 import ProgramComponent from '../ProgramComponent.js';
 import ProgramStageComponent from '../ProgramStageComponent.js';
+import { DataElementComponent } from '../DataElement';
 
 export const Main = () => {
     const engine = useDataEngine();
@@ -57,7 +58,14 @@ export const Main = () => {
     const [groupValues, setGroupValues] = useState({});
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [modalShow, setModalShow] = useState(false);
+    const [confirmShow, setConfirmShow] = useState(false);
     const [templateName, setTemplateName] = useState('');
+    const [attributesFilter, setAttributesFilters] = useState({});
+
+    const {show} = useAlert(
+        ({msg}) => msg,
+        ({type}) => ({[type]: true})
+    )
 
     const dataStoreQuery = {
         dataStore: {
@@ -98,7 +106,7 @@ export const Main = () => {
             resource: `programStages`,
             id: ({id}) => id,
             params: ({
-                fields: 'repeatable, programStageDataElements(dataElement(id, name, valueType))'
+                fields: 'repeatable, programStageDataElements(dataElement(id, name, valueType, optionSet(id))'
             })
         }
     }
@@ -276,7 +284,9 @@ export const Main = () => {
             type: 'update',
             data: value
         }
-        engine.mutate(mutation)
+        engine.mutate(mutation).then(_ => {
+            show({msg: i18n.t('Event successfully saved'), type: 'success'});
+        });
     }
 
     const handleProgramChange = (event) => {
@@ -301,7 +311,7 @@ export const Main = () => {
         filterAttributes[filterAttr] = value;
         setFilterValue(filterAttributes);
 
-        if (value) {
+        if (value && (value + '').length > 0) {
             const entities = allEntities.filter(entity => {
                 const attribute = entity.attributes.find(attr => attr.attribute === filterAttr);
                 return attribute && attribute.value + '' === value + '';
@@ -420,12 +430,29 @@ export const Main = () => {
             return values.filter(value => formatDate(value.date) === formattedDate);
         }
 
+        const _edits = edits;
+        //If group action and an entity has been selected and not edited, add it here
+        if (groupEdit) {
+            selectedEntities.forEach(entity => {
+                if (!edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity)) {
+                    _edits.push({
+                            entity,
+                            values: [{
+                                date: startDate
+                            }]
+                        }
+                    );
+                }
+            })
+        }
         //Loop through each edit records and recreate event data for
-        edits.forEach(edit => {
+        console.log('Edits')
+        _edits.forEach(edit => {
             Map.groupBy(edit.values, ({date}) => formatDate(date)).keys().forEach(eventDate => {
-                let event = edit.entity.enrollments[0].events?.find(event => event.programStage === selectedStage &&
+                let event = edit.entity?.enrollments[0].events?.find(event => event.programStage === selectedStage &&
                     formatDate(event.occurredAt) === eventDate);
                 const values = filterValues(edit.values, eventDate);
+                console.log('Edit', edit, event)
                 if (!event) {
                     const existingEvent = edit.entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
                     if (existingEvent && !repeatable) {
@@ -443,26 +470,50 @@ export const Main = () => {
                 }
 
                 values.forEach(value => {
-                    const dataValue = event.dataValues.find(dv => dv.dataElement === value.dataElement.id) || {};
-                    dataValue.dataElement = value.dataElement.id;
-                    dataValue.value = (value.value ?? '') + '';
-                    if (value.dataElement.valueType === 'TRUE_ONLY' && !value.value) {
+                    if (value.dataElement) {
+                        const dataValue = event.dataValues.find(dv => dv.dataElement === value.dataElement.id) || {};
+                        dataValue.dataElement = value.dataElement.id;
+                        dataValue.value = (value.value ?? '') + '';
+                        if (value.dataElement.valueType === 'TRUE_ONLY' && !value.value) {
+                            dataValue.value = null;
+                        }
+                        if (value.dataElement.valueType.includes('DATE')) {
+                            dataValue.value = value.value ? new Date(value.value).toISOString() : '';
+                        }
+
+                        const dataValues = event.dataValues.filter(dv => dv.dataElement !== value.dataElement.id) || [];
+                        dataValues.push(dataValue);
+                        event.dataValues = dataValues;
+                    }
+                });
+
+                (configuredStages[selectedStage]['groupDataElements'] || []).map(de => {
+                    return {
+                        dataElement: de,
+                        value: groupDataElementValue(de)
+                    }
+                }).forEach(de => {
+                    const dataValue = event.dataValues.find(dv => dv.dataElement === de.dataElement) || {};
+                    dataValue.dataElement = de.dataElement;
+                    dataValue.value = (de.value ?? '') + '';
+                    const valueType = dataElements.find(d => d.id === de.dataElement)?.valueType ?? '';
+                    if (valueType === 'TRUE_ONLY' && !de.value) {
                         dataValue.value = null;
                     }
-                    if (value.dataElement.valueType.includes('DATE')) {
-                        dataValue.value = value.value ? value.value.toISOString() : '';
+                    if (valueType.includes('DATE')) {
+                        dataValue.value = de.value ? new Date(de.value).toISOString() : '';
                     }
 
-                    const dataValues = event.dataValues.filter(dv => dv.dataElement !== value.dataElement.id) || [];
+                    const dataValues = event.dataValues.filter(dv => dv.dataElement !== de.dataElement) || [];
                     dataValues.push(dataValue);
                     event.dataValues = dataValues;
-                });
+                })
 
                 events.push(event);
             });
         });
-
-        engine.mutate({
+        console.log('Events', events)
+        /*engine.mutate({
             resource: 'tracker',
             type: 'create',
             params: {
@@ -479,9 +530,12 @@ export const Main = () => {
                     orgUnit: orgUnit,
                     page,
                     pageSize
-                })
+                });
+                show({msg: i18n.t('Data successfully updated'), type: 'success'});
+            } else {
+                show({msg: i18n.t('There was an error updating records'), type: 'error'});
             }
-        });
+        });*/
     }
 
     // eslint-disable-next-line max-params
@@ -555,125 +609,13 @@ export const Main = () => {
     }
 
     const createOrUpdateGroupEvent = (dataElement, value) => {
-        if (dataElement.valueType.includes('INTEGER')) {
-            value = parseInt(value);
-            if (dataElement.valueType === 'INTEGER_ZERO_OR_POSITIVE' && parseInt(value) < 0) {
-                alert('Please enter a non-negative integer');
-                return;
-            }
-            if (dataElement.valueType === 'INTEGER_POSITIVE' && parseInt(value) <= 0) {
-                alert('Please enter a number greater than 0');
-                return;
-            }
-            if (dataElement.valueType === 'INTEGER_NEGATIVE' && parseInt(value) >= 0) {
-                alert('Please enter a number less than 0');
-                return;
-            }
-        }
-        if (!endDateVisible) {
-            const entities = selectedEntities.map((entity) => {
-                let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
-                if (!currentEdit) {
-                    currentEdit = {
-                        entity,
-                        values: []
-                    };
-                }
-                const values = currentEdit.values.filter(v => v.dataElement.id !== dataElement.id);
-                values.push({
-                    value,
-                    dataElement,
-                    startDate
-                });
-                currentEdit.values = values;
-
-                return currentEdit;
-            });
-            const originalEdit = originalEdits.find(edit => edit.dataElement.id === dataElement.id);
-
-            if (originalEdit?.dataElement?.id !== dataElement.id || ((originalEdit?.value ?? '')) !== ((value ?? '') + '')) {
-                if (!originalEdit) {
-                    setOriginalEdits([...originalEdits, {dataElement, value: ''}]);
-                }
-
-                setEdits(entities);
-            } else {
-                setEdits([])
-            }
-
-            const values = groupValues;
-            values[dataElement.id] = value;
-            setGroupValues(values);
-        }
+        const values = groupValues;
+        values[dataElement.id] = value;
+        setGroupValues(values);
     }
 
     const createOrUpdateIndividualEvent = (entity, dataElement, value) => {
-        if (dataElement.valueType.includes('INTEGER')) {
-            value = parseInt(value);
-            if (dataElement.valueType === 'INTEGER_ZERO_OR_POSITIVE' && parseInt(value) < 0) {
-                alert('Please enter a non-negative integer');
-                return;
-            }
-            if (dataElement.valueType === 'INTEGER_POSITIVE' && parseInt(value) <= 0) {
-                alert('Please enter a number greater than 0');
-                return;
-            }
-            if (dataElement.valueType === 'INTEGER_NEGATIVE' && parseInt(value) >= 0) {
-                alert('Please enter a number less than 0');
-                return;
-            }
-        }
-        const _edits = edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity);
-        let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
-        const originalEdit = originalEdits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
-        if (!currentEdit) {
-            currentEdit = {
-                entity,
-                values: []
-            };
-        }
-        const values = currentEdit.values.filter(v => !(v.dataElement.id === dataElement.id && formatDate(startDate) === formatDate(v.date)));
-        values.push({
-            value,
-            dataElement,
-            startDate
-        });
-        currentEdit.values = values;
-
-        const values2 = [...values];
-        const values1 = [...(Object.assign({}, originalEdits.find(edit => edit.entity.trackedEntity === entity.trackedEntity))?.values ?? [])];
-        const editChanged = () => {
-            if (values2.length !== values1.length) {
-                return true;
-            }
-            return values1.some(value => {
-                const match = values2.find(v => v.dataElement.id === value.dataElement.id && formatDate(v.date) === formatDate(value.date));
-                if (!match) {
-                    return true;
-                }
-                if (value.dataElement.valueType === 'TRUE_ONLY' || value.dataElement.valueType === 'BOOLEAN') {
-                    return !match.value !== !value.value;
-                }
-                return ((match.value ?? '') + '') !== ((value.value ?? '') + '');
-
-            })
-        }
-
-        if (originalEdit?.entity.trackedEntity !== currentEdit.entity.trackedEntity || editChanged()) {
-            _edits.push(currentEdit);
-
-            if (!originalEdit) {
-                setOriginalEdits([...originalEdits, {...currentEdit}]);
-            } else {
-                const _originalEdits = originalEdits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity);
-                const oldValues = {...originalEdit}.values.filter(v => v.dataElement.id === dataElement.id && formatDate(v.date) === formatDate(startDate));
-                const newValues = currentEdit.values.filter(v => !(v.dataElement.id === dataElement.id && formatDate(v.date) === formatDate(startDate)));
-                oldValues.push(...newValues);
-                setOriginalEdits([..._originalEdits, Object.assign({}, originalEdit, {values: oldValues})]);
-            }
-        }
-
-        setEdits(_edits);
+        createOrUpdateEvent(entity, startDate, dataElement, value);
     }
 
     const individualDataElementsForDates = () => {
@@ -738,8 +680,8 @@ export const Main = () => {
         setSelectedTemplate(name);
         const template = configuredStages[selectedStage]['templates'][name];
         if (template) {
-            setStateDate(template['startDate']);
-            setEndDate(template['endDate']);
+            setStateDate(new Date(template['startDate']));
+            setEndDate(new Date(template['endDate']));
             const values = groupValues;
             (template['dataElements'] || []).forEach(de => {
                 values[de.dataElement] = de.value;
@@ -798,308 +740,165 @@ export const Main = () => {
                                                 {i18n.t('Entity Filter')}
                                             </label>
                                             <div className="p-2 flex flex-row flex-wrap">
-                                                {filterAttributes.map((attr) => {
+                                                {filterAttributes.map((attr, idx) => {
                                                     const entityAttribute = entityAttributes.find(ea => ea.id === attr);
                                                     if (entityAttribute) {
-                                                        if (entityAttribute.optionSet?.id) {
-                                                            const optionsQuery = {
-                                                                optionSets: {
-                                                                    resource: 'optionSets',
-                                                                    id: entityAttribute.optionSet.id,
-                                                                    params: {
-                                                                        fields: 'id,options(code,displayName)',
-                                                                    }
-                                                                }
-                                                            }
-                                                            engine.query(optionsQuery).then(d => {
-                                                                const ao = attributeOptions;
-                                                                ao[attr] = d.optionSets?.options || [];
-                                                                setAttributeOptions(ao);
-                                                            });
-                                                            return <>
-                                                                <div className="w-3/12 flex mb-2">
-                                                                    <div>
-                                                                        <label htmlFor="program"
-                                                                               className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                            {i18n.t(`Select ${entityAttributes.find(a => a.id === attr)?.displayName}`)}
-                                                                        </label>
-                                                                        <select id="program"
-                                                                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                                                                value={filterValue[attr]}
-                                                                                onChange={(event) => filterEntities(attr, event.target.value)}>
-                                                                            <option
-                                                                                selected>Choose {entityAttributes.find(a => a.id === attr)?.displayName}</option>
-                                                                            {(attributeOptions[attr] || []).map(option => {
-                                                                                    return <>
-                                                                                        <option
-                                                                                            value={option.code}>{option.displayName}</option>
-                                                                                    </>
-                                                                                }
-                                                                            )}
-                                                                        </select>
-                                                                    </div>
-                                                                </div>
-                                                            </>
-                                                        } else {
-                                                            if (attr.valueType === 'TRUE_ONLY' || attr.valueType === 'BOOLEAN') {
-                                                                return <>
-                                                                    <div
-                                                                        className="w-3/12 flex items-center mb-2">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            onChange={(event) => filterEntities(attr, event.target.checked)}
-                                                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                        <label
-                                                                            className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                                                            {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                                        </label>
-                                                                    </div>
-                                                                </>
-                                                            }
-                                                            if (attr.valueType.includes('INTEGER') || attr.valueType === 'NUMBER') {
-                                                                return <>
-                                                                    <div
-                                                                        className="w-3/12 mb-2">
-                                                                        <label
-                                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                            {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                                        </label>
-                                                                        <input
-                                                                            type="number"
-                                                                            onChange={(event) => filterEntities(attr, event.target.value)}
-                                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                    </div>
-                                                                </>
-                                                            }
-                                                            if (attr.valueType.includes('TEXT')) {
-                                                                return <>
-                                                                    <div
-                                                                        className="w-3/12 mb-2">
-                                                                        <label
-                                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                            {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                                        </label>
-                                                                        <input
-                                                                            type="text"
-                                                                            onChange={(event) => filterEntities(attr, event.target.value)}
-                                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                    </div>
-                                                                </>
-                                                            }
-                                                            if (attr.valueType.includes('DATE')) {
-                                                                return <>
-                                                                    <div className="w-3/12 mb-2">
-                                                                        <label
-                                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                            {entityAttributes.find(a => a.id === attr)?.displayName}
-                                                                        </label>
-                                                                        <CalendarInput
-                                                                            label=""
-                                                                            calendar="gregory"
-                                                                            onDateSelect={(event) => filterEntities(attr, new Date(event.calendarDateString).toISOString())}
-                                                                        />
-                                                                    </div>
-                                                                </>
-                                                            }
-                                                        }
+                                                        return <>
+                                                            <DataElementComponent key={idx}
+                                                                                  dataElement={attr}
+                                                                                  labelVisible={true}
+                                                                                  value={filterValue[attr]}
+                                                                                  label={entityAttributes.find(a => a.id === attr)?.displayName}
+                                                                                  valueChanged={(_, v) => filterEntities(attr, v)}/>
+                                                        </>
                                                     }
                                                 })}
                                             </div>
                                         </div>
                                     }
-                                    <div className="flex flex-col w-full mb-2">
-                                        <div className="w-full rounded-md bg-white p-3 flex flex-row gap-x-1">
-                                            <div className="w-3/12 flex flex-col">
-                                                <label
-                                                    className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                    {endDateVisible ? 'Event Start Date' : 'Event Date'}
-                                                </label>
-                                                <CalendarInput
-                                                    label=""
-                                                    calendar="gregory"
-                                                    date={startDate.toISOString().slice(0, 10)}
-                                                    onDateSelect={stateDateChanged}
-                                                />
-                                            </div>
-                                            {endDateVisible && (repeatable || groupEdit) &&
+                                    {selectedStage &&
+                                        <div className="flex flex-col w-full mb-2">
+                                            <div className="w-full rounded-md bg-white p-3 flex flex-row gap-x-1">
                                                 <div className="w-3/12 flex flex-col">
                                                     <label
                                                         className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                        {'Event End Date'}
+                                                        {((endDateVisible && repeatable) || groupEdit) ? 'Event Start Date' : 'Event Date'}
                                                     </label>
                                                     <CalendarInput
                                                         label=""
                                                         calendar="gregory"
-                                                        date={endDate?.toISOString().slice(0, 10)}
-                                                        max={new Date().toISOString().slice(0, 10)}
-                                                        onDateSelect={endDateChanged}
+                                                        date={startDate && startDate.toISOString ? startDate?.toISOString().slice(0, 10) : ''}
+                                                        onDateSelect={stateDateChanged}
                                                     />
                                                 </div>
-                                            }
-                                        </div>
-                                        {groupEdit &&
-                                            <div className="w-full flex flex-col pt-2">
-                                                <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
-                                                    {configuredStages[selectedStage] && Object.keys(configuredStages[selectedStage]['templates'] || {}).length > 0 &&
-                                                        <div className="w-3/12">
-                                                            <label htmlFor="stage"
-                                                                   className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                {i18n.t('Select group template')}
-                                                            </label>
-                                                            <select id="stage"
-                                                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                                                    value={selectedTemplate}
-                                                                    onChange={(event) => handleTemplateChange(event.target.value)}>
-                                                                <option selected>Choose a template</option>
-                                                                {Object.keys(configuredStages[selectedStage]['templates'] || {}).map((name) => (
-                                                                        <option label={name} value={name} key={name}/>
-                                                                    )
-                                                                )}
-                                                            </select>
-                                                        </div>
-                                                    }
-                                                    <div className="relative overflow-x-auto shadow-md sm:rounded-lg">
-                                                        <div className="w-3/12 p-2">
-                                                            {dataElements.map(de => {
-                                                                const configuredDataElements = configuredStages[selectedStage]['dataElements'] || [];
-                                                                if ((de.valueType === 'TRUE_ONLY' || de.valueType === 'BOOLEAN') && configuredDataElements.includes(de.id)) {
-                                                                    return <>
-                                                                        <div
-                                                                            className="flex items-center mb-4">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={groupDataElementValue(de.id) === true}
-                                                                                onChange={(event) => createOrUpdateGroupEvent(de, event.target.checked)}
-                                                                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                            <label
-                                                                                className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                                                                {de.name}
-                                                                            </label>
-                                                                        </div>
-                                                                    </>
-                                                                }
-                                                                if ((de.valueType.includes('INTEGER') || de.valueType === 'NUMBER') && configuredDataElements.includes(de.id)) {
-                                                                    return <>
-                                                                        <div
-                                                                            className="mb-5">
-                                                                            <label
-                                                                                className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                {de.name}
-                                                                            </label>
-                                                                            <input
-                                                                                type="number"
-                                                                                value={groupDataElementValue(de.id)}
-                                                                                onChange={(event) => createOrUpdateGroupEvent(de, event.target.value)}
-                                                                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                        </div>
-                                                                    </>
-                                                                }
-                                                                if (de.valueType.includes('TEXT') && configuredDataElements.includes(de.id)) {
-                                                                    return <>
-                                                                        <div
-                                                                            className="mb-5">
-                                                                            <label
-                                                                                className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                {de.name}
-                                                                            </label>
-                                                                            <input
-                                                                                type="text"
-                                                                                value={groupDataElementValue(de.id)}
-                                                                                onChange={(event) => createOrUpdateGroupEvent(de, event.target.value)}
-                                                                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                        </div>
-                                                                    </>
-                                                                }
-                                                                if (de.valueType.includes('DATE') && configuredDataElements.includes(de.id)) {
-                                                                    return <>
-                                                                        <div
-                                                                            className="mb-5 flex flex-col">
-                                                                            <label
-                                                                                className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                {de.name}
-                                                                            </label>
-                                                                            <CalendarInput
-                                                                                calendar="gregory"
-                                                                                label=""
-                                                                                date={groupDataElementValue(de.id)?.substring(0, 10)}
-                                                                                onDateSelect={(event) => createOrUpdateGroupEvent(de, new Date(event.calendarDateString).toISOString())}
-                                                                            />
-                                                                        </div>
-                                                                    </>
-                                                                }
-                                                            })}
-                                                        </div>
+                                                {((endDateVisible && repeatable) || groupEdit) &&
+                                                    <div className="w-3/12 flex flex-col">
+                                                        <label
+                                                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                            {'Event End Date'}
+                                                        </label>
+                                                        <CalendarInput
+                                                            label=""
+                                                            calendar="gregory"
+                                                            date={endDate && endDate.toISOString ? endDate?.toISOString().slice(0, 10) : ''}
+                                                            max={new Date().toISOString().slice(0, 10)}
+                                                            onDateSelect={endDateChanged}
+                                                        />
                                                     </div>
-                                                    {configuredStages[selectedStage] && (configuredStages[selectedStage]['dataElements'] || []).length > 0 &&
-                                                        <div className="flex flex-row justify-end">
-                                                            <button type="button"
-                                                                    className="mt-2 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-                                                                    onClick={() => setModalShow(true)}>Save as Template
-                                                            </button>
-                                                        </div>
-                                                    }
-                                                </div>
+                                                }
                                             </div>
-                                        }
-                                        {selectedStage &&
-                                            <div className="w-full flex flex-col pt-2">
-                                                <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
-                                                    <div
-                                                        className="relative overflow-x-auto shadow-md sm:rounded-lg">
-                                                        <table
-                                                            className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                                                            <caption
-                                                                className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
+                                            {groupEdit && (selectedStage || groupValues) && dataElements.length > 0 && (configuredStages[selectedStage]['groupDataElements'] || []).length > 0 &&
+                                                <div className="w-full flex flex-col pt-2">
+                                                    <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
+                                                        {configuredStages[selectedStage] && Object.keys(configuredStages[selectedStage]['templates'] || {}).length > 0 &&
+                                                            <div className="w-3/12">
+                                                                <label htmlFor="stage"
+                                                                       className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {i18n.t('Select Saved Event')}
+                                                                </label>
+                                                                <select id="stage"
+                                                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                                                        value={selectedTemplate}
+                                                                        onChange={(event) => handleTemplateChange(event.target.value)}>
+                                                                    <option selected>Choose event</option>
+                                                                    {Object.keys(configuredStages[selectedStage]['templates'] || {}).map((name) => (
+                                                                            <option label={name} value={name} key={name}/>
+                                                                        )
+                                                                    )}
+                                                                </select>
+                                                            </div>
+                                                        }
+                                                        <div
+                                                            className="relative overflow-x-auto shadow-md sm:rounded-lg">
+                                                            <div className="w-3/12 p-2">
+                                                                {dataElements.length > 0 && (configuredStages[selectedStage]['groupDataElements'] || []).map((cde, idx) => {
+                                                                    const de = dataElements.find(de => de.id === cde);
+                                                                    return <>
+                                                                        <DataElementComponent key={idx}
+                                                                                              value={groupDataElementValue(cde)}
+                                                                                              dataElement={de}
+                                                                                              labelVisible={true}
+                                                                                              valueChanged={createOrUpdateGroupEvent}/>
+                                                                    </>
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                        {configuredStages[selectedStage] && (configuredStages[selectedStage]['groupDataElements'] || []).length > 0 &&
+                                                            <div className="flex flex-row justify-end">
+                                                                <button type="button"
+                                                                        className="mt-2 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                        onClick={() => setModalShow(true)}>Save Event
+                                                                </button>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                            {selectedStage &&
+                                                <div className="w-full flex flex-col pt-2">
+                                                    <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
+                                                        <div
+                                                            className="relative overflow-x-auto shadow-md sm:rounded-lg">
+                                                            <table
+                                                                className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                                                <caption
+                                                                    className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
 
-                                                                <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                                                    <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
 
-                                                                </p>
-                                                                <div className="flex flex-row justify-end">
-                                                                    {edits.length !== 0 &&
+                                                                    </p>
+                                                                    <div className="flex flex-row justify-end">
                                                                         <button type="button"
                                                                                 className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-                                                                                onClick={saveEdits}>Save Records
+                                                                                onClick={() => setConfirmShow(true)}>Reload
+                                                                            records
                                                                         </button>
+                                                                        {edits.length !== 0 && selectedEntities.length > 0 &&
+                                                                            <button type="button"
+                                                                                    className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                                    onClick={saveEdits}>Save Records
+                                                                            </button>
+                                                                        }
+                                                                    </div>
+                                                                </caption>
+                                                                <thead
+                                                                    className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                                <tr>
+                                                                    {groupEdit &&
+                                                                        <th rowSpan={2}
+                                                                            className="px-6 py-6">
+                                                                            <div
+                                                                                className="flex items-center mb-4">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    onChange={(event) => {
+                                                                                        if (event.target.checked) {
+                                                                                            console.log('All entities', allEntities)
+                                                                                            setSelectedEntities(allEntities)
+                                                                                        } else {
+                                                                                            setSelectedEntities([])
+                                                                                            setEdits([])
+                                                                                        }
+                                                                                    }}
+                                                                                    checked={selectedEntities.length === entities.length}
+                                                                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                                                            </div>
+                                                                        </th>
                                                                     }
-                                                                </div>
-                                                            </caption>
-                                                            <thead
-                                                                className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                                            <tr>
-                                                                {groupEdit &&
-                                                                    <th rowSpan={(endDateVisible || groupEdit) && columnDisplay ? 7 : (endDateVisible || groupEdit) && !columnDisplay ? 2 : !(endDateVisible || groupEdit) && columnDisplay ? 5 : 1}
-                                                                        className="px-6 py-6">
-                                                                        <div
-                                                                            className="flex items-center mb-4">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                onChange={(event) => {
-                                                                                    if (event.target.checked) {
-                                                                                        setSelectedEntities(entities)
-                                                                                    } else {
-                                                                                        setSelectedEntities([])
-                                                                                        setEdits([])
-                                                                                    }
-                                                                                }}
-                                                                                checked={selectedEntities.length === entities.length}
-                                                                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                        </div>
+                                                                    <th data-priority="1" className="px-6 py-3"
+                                                                        rowSpan={2}>#
                                                                     </th>
-                                                                }
-                                                                <th data-priority="1" className="px-6 py-3"
-                                                                    rowSpan={(endDateVisible || groupEdit) && columnDisplay ? 7 : (endDateVisible || groupEdit) && !columnDisplay ? 2 : !(endDateVisible || groupEdit) && columnDisplay ? 5 : 1}>#
-                                                                </th>
-                                                                <th data-priority="2" className="px-6 py-3"
-                                                                    rowSpan={(endDateVisible || groupEdit) && columnDisplay ? 7 : (endDateVisible || groupEdit) && !columnDisplay ? 2 : !(endDateVisible || groupEdit) && columnDisplay ? 5 : 1}>Profile
-                                                                </th>
-                                                                {groupEdit &&
-                                                                    <th data-priority="3"
-                                                                        className="px-6 py-3 mx-auto text-center"
-                                                                        colSpan={columnDisplay ? datesBetween(startDate, endDate) : 1}>
+                                                                    <th data-priority="2" className="px-6 py-3"
+                                                                        rowSpan={2}>Profile
                                                                     </th>
-                                                                }
-                                                            </tr>
-                                                            {/*{endDateVisible && !columnDisplay && !groupEdit &&
+                                                                    {groupEdit &&
+                                                                        <th data-priority="3"
+                                                                            className="px-6 py-3 mx-auto text-center"
+                                                                            colSpan={columnDisplay ? datesBetween(startDate, endDate) : 1}>
+                                                                        </th>
+                                                                    }
+                                                                </tr>
+                                                                {/*{endDateVisible && !columnDisplay && !groupEdit &&
                                                         <tr>
                                                             {dates.map((date, idx) => {
                                                                 return <th key={idx}
@@ -1121,7 +920,7 @@ export const Main = () => {
                                                             })}
                                                         </tr>
                                                     }*/}
-                                                            {/*{endDateVisible && columnDisplay && !groupEdit &&
+                                                                {/*{endDateVisible && columnDisplay && !groupEdit &&
                                                         <>
                                                             <tr>
                                                                 {dates.map((date, idx) => {
@@ -1163,33 +962,33 @@ export const Main = () => {
                                                             </tr>
                                                         </>
                                                     }*/}
-                                                            {!groupEdit &&
-                                                                <tr>
-                                                                    {(configuredStages[selectedStage]['dataElements'] || []).map((id, idx) => {
-                                                                        const de = dataElements.find(e => e.id === id);
-                                                                        return <th key={idx}
-                                                                                   rowSpan={5}
-                                                                                   className="px-6 py-3">
-                                                                            <div
-                                                                                className="text-sm font-medium text-gray-900 dark:text-gray-300 text-left -rotate-90 w-16 pb-4">{de?.name}</div>
-                                                                        </th>
-                                                                    })}
-                                                                </tr>
-                                                            }
-                                                            {groupEdit &&
-                                                                <>
+                                                                {!groupEdit && configuredStages[selectedStage] &&
                                                                     <tr>
-                                                                        {individualDataElementsForDates().map((id, idx) => {
-                                                                            const de = dataElements.find(e => e.id === id)
+                                                                        {(configuredStages[selectedStage]['dataElements'] || []).map((id, idx) => {
+                                                                            const de = dataElements.find(e => e.id === id);
                                                                             return <th key={idx}
                                                                                        rowSpan={5}
                                                                                        className="px-6 py-3">
-                                                                                <div
-                                                                                    className="text-left -rotate-90 w-16 pb-4">{de?.name}</div>
+                                                                            <span
+                                                                                className="whitespace-nowrap text-xs block font-normal text-gray-900 dark:text-gray-300 text-left -rotate-90 w-16 pb-4">{de?.name}</span>
                                                                             </th>
                                                                         })}
                                                                     </tr>
-                                                                    {/* <tr>
+                                                                }
+                                                                {groupEdit &&
+                                                                    <>
+                                                                        <tr>
+                                                                            {individualDataElementsForDates().map((id, idx) => {
+                                                                                const de = dataElements.find(e => e.id === id)
+                                                                                return <th key={idx}
+                                                                                           rowSpan={7}
+                                                                                           className="px-6 py-3">
+                                                                                    <div
+                                                                                        className="text-left -rotate-90 w-16 pb-4">{de?.name}</div>
+                                                                                </th>
+                                                                            })}
+                                                                        </tr>
+                                                                        {/* <tr>
                                                                 {dates.map(_ => {
                                                                     return <>
                                                                         {
@@ -1206,53 +1005,55 @@ export const Main = () => {
                                                                     </>
                                                                 })}
                                                             </tr>*/}
-                                                                </>
-                                                            }
-                                                            </thead>
-                                                            <tbody>
-                                                            {entities.map((entity, index) => {
-                                                                return <>
-                                                                    <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
-                                                                        {groupEdit &&
-                                                                            <td className="px-6 py-6">
-                                                                                <div
-                                                                                    className="flex items-center mb-4">
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        checked={selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)}
-                                                                                        onChange={() => {
-                                                                                            if (selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)) {
-                                                                                                setSelectedEntities(selectedEntities.filter(rowId => rowId.trackedEntity !== entity.trackedEntity));
-                                                                                                setEdits(edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity))
-                                                                                            } else {
-                                                                                                setSelectedEntities([...selectedEntities, entity]);
+                                                                    </>
+                                                                }
+                                                                </thead>
+                                                                <tbody>
+                                                                {entities.map((entity, index) => {
+                                                                    return <>
+                                                                        <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                                                                            {groupEdit &&
+                                                                                <td className="px-6 py-6">
+                                                                                    <div
+                                                                                        className="flex items-center mb-4">
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)}
+                                                                                            onChange={() => {
+                                                                                                if (selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)) {
+                                                                                                    setSelectedEntities(selectedEntities.filter(rowId => rowId.trackedEntity !== entity.trackedEntity));
+                                                                                                    setEdits(edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity))
+                                                                                                } else {
+                                                                                                    setSelectedEntities([...selectedEntities, entity]);
 
-                                                                                                let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
-                                                                                                if (!currentEdit) {
-                                                                                                    currentEdit = {
-                                                                                                        entity
-                                                                                                    };
-                                                                                                }
-                                                                                                const sample = edits[0];
-                                                                                                if (sample) {
-                                                                                                    currentEdit.values = sample.values;
+                                                                                                    let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
+                                                                                                    if (!currentEdit) {
+                                                                                                        currentEdit = {
+                                                                                                            entity
+                                                                                                        };
+                                                                                                    }
+                                                                                                    const sample = edits[0];
+                                                                                                    if (sample) {
+                                                                                                        currentEdit.values = sample.values;
 
-                                                                                                    setEdits([...edits, currentEdit]);
+                                                                                                        setEdits([...edits, currentEdit]);
+                                                                                                    }
                                                                                                 }
-                                                                                            }
-                                                                                        }}
-                                                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                                </div>
-                                                                            </td>
-                                                                        }
-                                                                        <td>{index + 1}</td>
-                                                                        <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity)}</td>
-                                                                        {!groupEdit && dates.map((date, idx) => {
-                                                                            if (!columnDisplay) {
-                                                                                return <>
-                                                                                    <td key={idx} className="px-6 py-4">
-                                                                                        <div className="flex flex-row">
-                                                                                            {/* <div
+                                                                                            }}
+                                                                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                                                                    </div>
+                                                                                </td>
+                                                                            }
+                                                                            <td>{index + 1}</td>
+                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity)}</td>
+                                                                            {!groupEdit && dates.map((date, idx) => {
+                                                                                if (!columnDisplay) {
+                                                                                    return <>
+                                                                                        <td key={idx}
+                                                                                            className="px-6 py-4">
+                                                                                            <div
+                                                                                                className="flex flex-row">
+                                                                                                {/* <div
                                                                                     className="w-1/12 flex flex-col">
                                                                                     <div
                                                                                         className="flex items-center mb-4">
@@ -1265,158 +1066,53 @@ export const Main = () => {
                                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                                                     </div>
                                                                                 </div>*/}
-                                                                                            <div
-                                                                                                className="w-11/12 flex flex-col">
                                                                                                 <div
-                                                                                                    className="flex flex-col gap-1">
-                                                                                                    {dataElements.map(de => {
-                                                                                                        const configuredDataElements = configuredStages[selectedStage]['dataElements'] || [];
-                                                                                                        if ((de.valueType === 'TRUE_ONLY' || de.valueType === 'BOOLEAN') && configuredDataElements.includes(de.id)) {
+                                                                                                    className="w-11/12 flex flex-col">
+                                                                                                    <div
+                                                                                                        className="flex flex-col gap-1">
+                                                                                                        {(dataElements.length > 0 && configuredStages[selectedStage]['dataElements'] || []).map((cde, idx) => {
+                                                                                                            const de = dataElements.find(de => de.id === cde);
                                                                                                             return <>
-                                                                                                                <div
-                                                                                                                    className="flex items-center mb-4">
-                                                                                                                    <input
-                                                                                                                        type="checkbox"
-                                                                                                                        checked={dataElementValue(date, de.id, entity) === 'true'}
-                                                                                                                        onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.checked)}
-                                                                                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                                                                    <label
-                                                                                                                        className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                </div>
+                                                                                                                <DataElementComponent
+                                                                                                                    key={idx}
+                                                                                                                    value={dataElementValue(date, de.id, entity)}
+                                                                                                                    dataElement={de}
+                                                                                                                    labelVisible={true}
+                                                                                                                    valueChanged={(d, v) => createOrUpdateEvent(entity, date, de, v)}/>
                                                                                                             </>
-                                                                                                        }
-                                                                                                        if ((de.valueType.includes('INTEGER') || de.valueType === 'NUMBER') && configuredDataElements.includes(de.id)) {
-                                                                                                            return <>
-                                                                                                                <div
-                                                                                                                    className="mb-5">
-                                                                                                                    <label
-                                                                                                                        className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                    <input
-                                                                                                                        type="number"
-                                                                                                                        value={dataElementValue(date, de.id, entity)}
-                                                                                                                        onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.value)}
-                                                                                                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                                                                </div>
-                                                                                                            </>
-                                                                                                        }
-                                                                                                        if (de.valueType.includes('TEXT') && configuredDataElements.includes(de.id)) {
-                                                                                                            return <>
-                                                                                                                <div
-                                                                                                                    className="mb-5">
-                                                                                                                    <label
-                                                                                                                        className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                    <input
-                                                                                                                        type="text"
-                                                                                                                        value={dataElementValue(date, de.id, entity)}
-                                                                                                                        onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.value)}
-                                                                                                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                                                                </div>
-                                                                                                            </>
-                                                                                                        }
-                                                                                                        if (de.valueType.includes('DATE') && configuredDataElements.includes(de.id)) {
-                                                                                                            return <>
-                                                                                                                <div
-                                                                                                                    className="mb-5 flex flex-col">
-                                                                                                                    <label
-                                                                                                                        className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                    <CalendarInput
-                                                                                                                        calendar="gregory"
-                                                                                                                        label=""
-                                                                                                                        date={dataElementValue(date, de.id, entity)?.substring(0, 10)}
-                                                                                                                        onDateSelect={(event) => createOrUpdateEvent(entity, date, de, new Date(event.calendarDateString).toISOString())}
-                                                                                                                    />
-                                                                                                                </div>
-                                                                                                            </>
-                                                                                                        }
-                                                                                                    })}
+                                                                                                        })}
+                                                                                                    </div>
                                                                                                 </div>
                                                                                             </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                </>
-                                                                            } else {
-                                                                                return <>
-                                                                                    {(configuredStages[selectedStage]['dataElements'] || []).map((id, idx2) => {
-                                                                                        const de = dataElements.find(de => de.id === id);
-                                                                                        if ((de?.valueType === 'TRUE_ONLY' || de.valueType === 'BOOLEAN')) {
+                                                                                        </td>
+                                                                                    </>
+                                                                                } else {
+                                                                                    return <>
+                                                                                        {(configuredStages[selectedStage]['dataElements'] || []).map((id, idx2) => {
+                                                                                            const de = dataElements.find(de => de.id === id);
+
                                                                                             return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
-                                                                                                    <div
-                                                                                                        className="flex items-center mb-4">
-                                                                                                        <input
-                                                                                                            type="checkbox"
-                                                                                                            checked={dataElementValue(date, de.id, entity) === 'true'}
-                                                                                                            onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.checked)}
-                                                                                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                                                    </div>
+                                                                                                <td>
+                                                                                                    <DataElementComponent
+                                                                                                        key={idx2}
+                                                                                                        value={dataElementValue(date, de.id, entity)}
+                                                                                                        dataElement={de}
+                                                                                                        labelVisible={true}
+                                                                                                        valueChanged={(d, v) => createOrUpdateEvent(entity, date, de, v)}/>
                                                                                                 </td>
                                                                                             </>
-                                                                                        }
-                                                                                        if ((de?.valueType.includes('INTEGER') || de.valueType === 'NUMBER')) {
-                                                                                            return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
-                                                                                                    <div
-                                                                                                        className="mb-5">
-                                                                                                        <input
-                                                                                                            type="number"
-                                                                                                            value={dataElementValue(date, de.id, entity)}
-                                                                                                            onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.value)}
-                                                                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                            </>
-                                                                                        }
-                                                                                        if (de?.valueType.includes('TEXT')) {
-                                                                                            return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
-                                                                                                    <div
-                                                                                                        className="mb-5">
-                                                                                                        <input
-                                                                                                            type="text"
-                                                                                                            value={dataElementValue(date, de.id, entity)}
-                                                                                                            onChange={(event) => createOrUpdateEvent(entity, date, de, event.target.value)}
-                                                                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                            </>
-                                                                                        }
-                                                                                        if (de?.valueType.includes('DATE')) {
-                                                                                            return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
-                                                                                                    <div
-                                                                                                        className="mb-5 flex flex-col">
-                                                                                                        <CalendarInput
-                                                                                                            calendar="gregory"
-                                                                                                            label=""
-                                                                                                            date={dataElementValue(date, de.id, entity)?.substring(0, 10)}
-                                                                                                            onDateSelect={(event) => createOrUpdateEvent(entity, date, de, new Date(event.calendarDateString).toISOString())}
-                                                                                                        />
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                            </>
-                                                                                        }
-                                                                                    })}
-                                                                                </>
-                                                                            }
-                                                                        })}
-                                                                        {groupEdit && (['']).map((_, idx) => {
-                                                                            if (!columnDisplay) {
-                                                                                return <>
-                                                                                    <td key={idx} className="px-6 py-4">
-                                                                                        <div className="flex flex-row">
-                                                                                            {/* <div
+                                                                                        })}
+                                                                                    </>
+                                                                                }
+                                                                            })}
+                                                                            {groupEdit && (['']).map((_, idx) => {
+                                                                                if (!columnDisplay) {
+                                                                                    return <>
+                                                                                        <td key={idx}
+                                                                                            className="px-6 py-4">
+                                                                                            <div
+                                                                                                className="flex flex-row">
+                                                                                                {/* <div
                                                                                     className="w-1/12 flex flex-col">
                                                                                     <div
                                                                                         className="flex items-center mb-4">
@@ -1429,170 +1125,67 @@ export const Main = () => {
                                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                                                     </div>
                                                                                 </div>*/}
-                                                                                            <div
-                                                                                                className="w-11/12 flex flex-col">
                                                                                                 <div
-                                                                                                    className="flex flex-col gap-1">
-                                                                                                    {dataElements.map(de => {
-                                                                                                        const configuredDataElements = individualDataElementsForDates();
-                                                                                                        if ((de.valueType === 'TRUE_ONLY' || de.valueType === 'BOOLEAN') && configuredDataElements.includes(de.id)) {
+                                                                                                    className="w-11/12 flex flex-col">
+                                                                                                    <div
+                                                                                                        className="flex flex-col gap-1">
+                                                                                                        {dataElements.length > 0 && individualDataElementsForDates().map((cde, idx) => {
+                                                                                                            const de = dataElements.find(de => de.id === cde);
                                                                                                             return <>
-                                                                                                                <div
-                                                                                                                    className="flex items-center mb-4">
-                                                                                                                    <input
-                                                                                                                        type="checkbox"
-                                                                                                                        checked={dataElementValue(startDate, de.id, entity) === 'true'}
-                                                                                                                        onChange={(event) => createOrUpdateIndividualEvent(entity, de, event.target.checked)}
-                                                                                                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                                                                    <label
-                                                                                                                        className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                </div>
+                                                                                                                <DataElementComponent
+                                                                                                                    key={idx}
+                                                                                                                    value={dataElementValue(startDate, de.id, entity)}
+                                                                                                                    dataElement={de}
+                                                                                                                    labelVisible={true}
+                                                                                                                    valueChanged={(d, v) => createOrUpdateIndividualEvent(entity, de, v)}/>
                                                                                                             </>
-                                                                                                        }
-                                                                                                        if ((de.valueType.includes('INTEGER') || de.valueType === 'NUMBER') && configuredDataElements.includes(de.id)) {
-                                                                                                            return <>
-                                                                                                                <div
-                                                                                                                    className="mb-5">
-                                                                                                                    <label
-                                                                                                                        className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                    <input
-                                                                                                                        type="number"
-                                                                                                                        value={dataElementValue(startDate, de.id, entity)}
-                                                                                                                        onChange={(event) => createOrUpdateIndividualEvent(entity, de, event.target.value)}
-                                                                                                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                                                                </div>
-                                                                                                            </>
-                                                                                                        }
-                                                                                                        if (de.valueType.includes('TEXT') && configuredDataElements.includes(de.id)) {
-                                                                                                            return <>
-                                                                                                                <div
-                                                                                                                    className="mb-5">
-                                                                                                                    <label
-                                                                                                                        className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                    <input
-                                                                                                                        type="text"
-                                                                                                                        value={dataElementValue(startDate, de.id, entity)}
-                                                                                                                        onChange={(event) => createOrUpdateIndividualEvent(entity, de, event.target.value)}
-                                                                                                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                                                                </div>
-                                                                                                            </>
-                                                                                                        }
-                                                                                                        if (de.valueType.includes('DATE') && configuredDataElements.includes(de.id)) {
-                                                                                                            return <>
-                                                                                                                <div
-                                                                                                                    className="mb-5 flex flex-col">
-                                                                                                                    <label
-                                                                                                                        className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                                                                        {de.name}
-                                                                                                                    </label>
-                                                                                                                    <CalendarInput
-                                                                                                                        calendar="gregory"
-                                                                                                                        label=""
-                                                                                                                        date={dataElementValue(startDate, de.id, entity)?.substring(0, 10)}
-                                                                                                                        onDateSelect={(event) => createOrUpdateIndividualEvent(entity, de, new Date(event.calendarDateString).toISOString())}
-                                                                                                                    />
-                                                                                                                </div>
-                                                                                                            </>
-                                                                                                        }
-                                                                                                    })}
+                                                                                                        })}
+                                                                                                    </div>
                                                                                                 </div>
                                                                                             </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                </>
-                                                                            } else {
-                                                                                return <>
-                                                                                    {dataElements.map((de, idx2) => {
-                                                                                        const configuredDataElements = individualDataElementsForDates();
-
-                                                                                        if ((de.valueType === 'TRUE_ONLY' || de.valueType === 'BOOLEAN') && configuredDataElements.includes(de.id)) {
+                                                                                        </td>
+                                                                                    </>
+                                                                                } else {
+                                                                                    return <>
+                                                                                        {dataElements.length > 0 && individualDataElementsForDates().map((cde, idx2) => {
+                                                                                            const de = dataElements.find(de => de.id === cde);
                                                                                             return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
+                                                                                                <td>
                                                                                                     <div
-                                                                                                        className="flex items-center mb-4">
-                                                                                                        <input
-                                                                                                            type="checkbox"
-                                                                                                            checked={dataElementValue(startDate, de.id, entity) === 'true'}
-                                                                                                            onChange={(event) => createOrUpdateIndividualEvent(entity, de, event.target.checked)}
-                                                                                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                            </>
-                                                                                        }
-                                                                                        if ((de.valueType.includes('INTEGER') || de.valueType === 'NUMBER') && configuredDataElements.includes(de.id)) {
-                                                                                            return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
-                                                                                                    <div
-                                                                                                        className="mb-5">
-                                                                                                        <input
-                                                                                                            type="number"
+                                                                                                        className="flex flex-col my-auto">
+                                                                                                        <DataElementComponent
+                                                                                                            key={idx2}
                                                                                                             value={dataElementValue(startDate, de.id, entity)}
-                                                                                                            onChange={(event) => createOrUpdateIndividualEvent(entity, de, event.target.value)}
-                                                                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
+                                                                                                            dataElement={de}
+                                                                                                            labelVisible={false}
+                                                                                                            valueChanged={(d, v) => {
+                                                                                                                createOrUpdateIndividualEvent(entity, de, v)
+                                                                                                            }}/>
                                                                                                     </div>
                                                                                                 </td>
                                                                                             </>
-                                                                                        }
-                                                                                        if (de.valueType.includes('TEXT') && configuredDataElements.includes(de.id)) {
-                                                                                            return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
-                                                                                                    <div
-                                                                                                        className="mb-5">
-                                                                                                        <input
-                                                                                                            type="text"
-                                                                                                            value={dataElementValue(startDate, de.id, entity)}
-                                                                                                            onChange={(event) => createOrUpdateIndividualEvent(entity, de, event.target.value)}
-                                                                                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                            </>
-                                                                                        }
-                                                                                        if (de.valueType.includes('DATE') && configuredDataElements.includes(de.id)) {
-                                                                                            return <>
-                                                                                                <td key={idx2}
-                                                                                                    className="px-6 py-4">
-                                                                                                    <div
-                                                                                                        className="mb-5 flex flex-col">
-                                                                                                        <CalendarInput
-                                                                                                            calendar="gregory"
-                                                                                                            label=""
-                                                                                                            date={dataElementValue(startDate, de.id, entity)?.substring(0, 10)}
-                                                                                                            onDateSelect={(event) => createOrUpdateIndividualEvent(entity, de, new Date(event.calendarDateString).toISOString())}
-                                                                                                        />
-                                                                                                    </div>
-                                                                                                </td>
-                                                                                            </>
-                                                                                        }
-                                                                                    })}
-                                                                                </>
-                                                                            }
-                                                                        })}
-                                                                    </tr>
-                                                                </>
-                                                            })}
-                                                            </tbody>
-                                                            <tfoot>
-                                                            <tr className="font-semibold text-gray-900 dark:text-white">
-                                                                <th scope="row" className="px-6 py-3 text-base">
+                                                                                        })}
+                                                                                    </>
+                                                                                }
+                                                                            })}
+                                                                        </tr>
+                                                                    </>
+                                                                })}
+                                                                </tbody>
+                                                                <tfoot>
+                                                                <tr className="font-semibold text-gray-900 dark:text-white">
+                                                                    <th scope="row" className="px-6 py-3 text-base">
 
-                                                                </th>
-                                                            </tr>
-                                                            </tfoot>
-                                                        </table>
+                                                                    </th>
+                                                                </tr>
+                                                                </tfoot>
+                                                            </table>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        }
-                                    </div>
+                                            }
+                                        </div>
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -1600,14 +1193,14 @@ export const Main = () => {
                 </div>
             </div>
             <Modal hide={!modalShow}>
-                <ModalTitle>Template</ModalTitle>
+                <ModalTitle>Event</ModalTitle>
 
                 <ModalContent>
                     <div
                         className="w-full mb-2">
                         <label
                             className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                            Template Name
+                            Event Name
                         </label>
                         <input
                             type="text"
@@ -1636,7 +1229,38 @@ export const Main = () => {
                                 setModalShow(false);
                                 saveGroupTemplate();
                             }}>
-                        Save as Template
+                        Save
+                    </button>
+                </ModalActions>
+            </Modal>
+            <Modal hide={!confirmShow}>
+                <ModalTitle>Reload profiles</ModalTitle>
+
+                <ModalContent>
+                    Click ok to reload data. Any unsaved data will be lost
+                </ModalContent>
+
+                <ModalActions>
+                    <button type="button"
+                            className="py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
+                            onClick={() => {
+                                setConfirmShow(false);
+                            }}>
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                            onClick={() => {
+                                refetch({
+                                    program: selectedProgram,
+                                    orgUnit: orgUnit,
+                                    page: 1,
+                                    pageSize
+                                });
+                                setConfirmShow(false);
+                            }}>
+                        Reload
                     </button>
                 </ModalActions>
             </Modal>
