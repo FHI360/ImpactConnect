@@ -1,8 +1,9 @@
 import { useDataEngine } from '@dhis2/app-runtime';
 import { CalendarInput } from '@dhis2/ui';
+import PropTypes from 'prop-types';
 import React, { useState } from 'react';
 
-export const DataElementComponent = ({dataElement, labelVisible, label, value, valueChanged}) => {
+export const DataElementComponent = ({dataElement, labelVisible, label, value, valueChanged, readonly}) => {
     const engine = useDataEngine();
     const [attributeOptions, setAttributeOptions] = useState({})
     return (
@@ -25,16 +26,15 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                             setAttributeOptions(ao);
                         });
                         return <>
-                            <div className="p-2">
+                            <div className="">
                                 {labelVisible &&
-                                    <label htmlFor="program"
-                                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                    <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                                         {label || de.name}
                                     </label>
                                 }
-                                <select id="program"
-                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                <select className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                                         value={value}
+                                        disabled={readonly}
                                         onChange={(event) => valueChanged(de, event.target.value)}>
                                     <option
                                         selected>Select one
@@ -56,6 +56,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     className="flex items-center mb-4">
                                     <input
                                         type="checkbox"
+                                        disabled={readonly}
                                         checked={value === true || value === 'true'}
                                         onChange={(event) => valueChanged(de, event.target.checked)}
                                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
@@ -79,6 +80,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     <input
                                         type="number"
                                         value={value}
+                                        disabled={readonly}
                                         onChange={(event) => valueChanged(de, event.target.value)}
                                         className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
                                 </div>
@@ -96,6 +98,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     <input
                                         type="text"
                                         value={value}
+                                        disabled={readonly}
                                         onChange={(event) => valueChanged(de, event.target.value)}
                                         className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
                                 </div>
@@ -113,6 +116,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     <CalendarInput
                                         calendar="gregory"
                                         label=""
+                                        disabled={readonly}
                                         date={(value ?? '').substring(0, 10)}
                                         onDateSelect={(event) => valueChanged(de, new Date(event.calendarDateString).toISOString())}
                                     />
@@ -125,3 +129,12 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
         </>
     )
 }
+
+DataElementComponent.propTypes = {
+    dataElement: PropTypes.string,
+    label: PropTypes.string,
+    labelVisible: PropTypes.bool,
+    readonly: PropTypes.bool,
+    value: PropTypes.string,
+    valueChanged: PropTypes.func
+};

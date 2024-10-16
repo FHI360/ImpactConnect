@@ -1,6 +1,7 @@
 export const config = {
     dataStoreName: 'impact-project-definition',
-    dataStoreSearchHistory: 'sherlock-search-history'
+    dataStoreSearchHistory: 'sherlock-search-history',
+    dataStoreKey: 'tunozegusoma'
 }
 
 export const ProjectsFiltersMore = 'fields=key,projectName,programid,attributesSelected,selectedOU,fullOrgUnitSearch';
