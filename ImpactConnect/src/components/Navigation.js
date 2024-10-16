@@ -38,6 +38,9 @@ export const Navigation = () => {
                 <NavigationItem to="/">
                     <span>Home</span>
                 </NavigationItem>
+                <NavigationItem to="/events">
+                    <span>Events</span>
+                </NavigationItem>
                 <NavigationItem to="/configure">
                     <span>Configuration</span>
                 </NavigationItem>
