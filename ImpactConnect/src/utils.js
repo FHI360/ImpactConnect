@@ -48,7 +48,6 @@ export const createOrUpdateDataStore = async (engine, postObject, store, key, mo
             type: modeType ? 'create' : 'update',
             data: postObject,
         });
-        // console.log('Mutation successful:', result);
         return result;
     } catch (error) {
         console.error('Error creating or updating object:', error);
@@ -377,3 +376,7 @@ export const useSharedState = () => {
     }
 }
 
+export const paginate = (array, pageNumber, pageSize) => {
+    const startIndex = (pageNumber - 1) * pageSize;
+    return array.slice(startIndex, startIndex + pageSize);
+}

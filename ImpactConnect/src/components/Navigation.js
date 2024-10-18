@@ -1,6 +1,7 @@
 import classnames from 'classnames';
 import React from 'react'
 import { Link, useMatch, useNavigate, } from 'react-router-dom';
+import { MainTitle } from '../consts';
 
 function NavigationItem({to, children, ...props}) {
     // function to navigate to different route
@@ -32,6 +33,14 @@ function NavigationItem({to, children, ...props}) {
 
 export const Navigation = () => {
     return <>
+        <div
+            className="relative top-0 left-0 z-50 w-full h-16 bg-white border-t border-gray-200 dark:bg-gray-700 dark:border-gray-600">
+            <a href="#" className="flex items-center pb-4 border-b border-b-gray-800">
+                <div className="text-center w-full">
+                    <h2 className="font-bold text-2xl">{MainTitle}</h2>
+                </div>
+            </a>
+        </div>
         <div
             className="relative top-0 left-0 z-50 w-full h-16 bg-white border-t border-gray-200 dark:bg-gray-700 dark:border-gray-600">
             <div className="grid h-full max-w-lg grid-cols-4 mx-auto font-medium">

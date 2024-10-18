@@ -3,47 +3,42 @@ import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
 import { config, MainTitle } from '../consts.js';
-import { SharedStateContext } from '../utils.js';
+import { createOrUpdateDataStore, paginate, SharedStateContext } from '../utils.js';
 import { DataElementComponent } from './DataElement.js';
 import { Navigation } from './Navigation.js';
 import OrganisationUnitComponent from './OrganisationUnitComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
-
-export const paginate = (array, pageNumber, pageSize) => {
-    const startIndex = (pageNumber - 1) * pageSize;
-    return array.slice(startIndex, startIndex + pageSize);
-}
 
 export const EventsComponent = () => {
     const engine = useDataEngine();
     const sharedState = useContext(SharedStateContext)
 
     const {
-        selectedSharedOU,
-        setSelectedSharedOU,
-        selectedSharedProgram,
-        setSelectedSharedOrgUnit,
         selectedSharedStage,
         setSelectedSharedStage
     } = sharedState;
 
-    const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
     const [selectedStage, setSelectedStage] = useState(selectedSharedStage);
     const [dataElements, setDataElements] = useState([]);
+    const [entityType, setEntityType] = useState('');
     const [orgUnit, setOrgUnit] = useState('');
     const [selectedOu, setSelectedOu] = useState();
     const [participants, setParticipants] = useState([]);
     const [entities, setEntities] = useState([]);
     const [selectedEntities, setSelectedEntities] = useState([]);
     const [allEntities, setAllEntities] = useState([]);
-    const [filterValue, setFilterValue] = useState({});
-    const [selectedOU, setSelectedOU] = useState(selectedSharedOU);
+    const [trainingAttributes, setTrainingAttributes] = useState([]);
+    const [trainingAttributesData, setTrainingAttributesData] = useState([]);
+    const [activeStage, setActiveStage] = useState('');
+    const [participantsProgram, setParticipantsProgram] = useState('');
+    const [trainingProgram, setTrainingProgram] = useState('');
     const [nameAttributes, setNameAttributes] = useState([]);
     const [filterAttributes, setFilterAttributes] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
     const [entityAttributes, setEntityAttributes] = useState([]);
     const [page, setPage] = useState(1);
     const [totalEntities, setTotalEntites] = useState(0);
+    const [training, setTraining] = useState('');
     const [pageSize, setPageSize] = useState(50);
     const [participantPageSize, setParticipantPageSize] = useState(50);
     const [participantsPage, setParticipantsPage] = useState(0);
@@ -116,11 +111,15 @@ export const EventsComponent = () => {
     const {
         data: attributesData,
         refetch: attributesRefetch
-    } = useDataQuery(attributesQuery, {variables: {program: selectedProgram}});
+    } = useDataQuery(attributesQuery, {variables: {program: participantsProgram}});
+
+    const {
+        data: dataTrainingAttributes,
+    } = useDataQuery(attributesQuery, {variables: {program: trainingProgram}});
 
     const {data: entityData, refetch} = useDataQuery(entitiesQuery, {
         variables: {
-            program: selectedProgram,
+            program: participantsProgram,
             orgUnit: orgUnit,
             page,
             pageSize
@@ -129,6 +128,16 @@ export const EventsComponent = () => {
 
     const {data: orgUnitsData} = useDataQuery(organisationsQuery);
 
+    const {data: programData} = useDataQuery({
+        programs: {
+            resource: `programs`,
+            params: {
+                fields: 'id, trackedEntityType(id)',
+                paging: false
+            }
+        }
+    });
+
     const {
         data: elementsData,
         refetch: refetchDataElements
@@ -136,17 +145,31 @@ export const EventsComponent = () => {
 
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
+    const {data: programAttributes} = useDataQuery({
+        programs: {
+            resource: `programs`,
+            params: {
+                fields: ['id, programTrackedEntityAttributes(trackedEntityAttribute(id, valueType))'],
+                paging: 'false'
+            },
+        }
+    })
+
     useEffect(() => {
         if (dataStore?.dataStore?.entries) {
             const entry = dataStore.dataStore.entries.find(e => e.key === `${config.dataStoreKey}`);
             if (entry) {
                 setNameAttributes(entry.value.nameAttributes || []);
                 setFilterAttributes(entry.value.filterAttributes || []);
+                setTrainingAttributes(entry.value.trainingAttributes || []);
                 setConfiguredStages(entry.value.configuredStages || {});
+                setTrainingProgram(entry.value.trainingProgram);
+                setParticipantsProgram(entry.value.participantsProgram);
                 setEndDateVisible(entry.value.endDateVisible);
                 setColumnDisplay(entry.value.columnDisplay);
                 setGroupEdit(entry.value.groupEdit);
-                setSelectedProgram(entry.value.program)
+                setActiveStage(entry.value.activeStage);
+                setSelectedStage(entry.value.activeStage);
             }
         }
     }, [dataStore]);
@@ -158,6 +181,12 @@ export const EventsComponent = () => {
     }, []);
 
     useEffect(() => {
+        if (programData && programData.programs) {
+            setEntityType(programData.programs.programs.find(p => p.id === trainingProgram)?.trackedEntityType.id)
+        }
+    }, [trainingProgram]);
+
+    useEffect(() => {
         if (entityData && entityData.entities) {
             setAllEntities(entityData.entities.instances);
             setEntities(entityData.entities.instances);
@@ -166,23 +195,29 @@ export const EventsComponent = () => {
             setEntities([]);
             setTotalEntites(0);
         }
-    }, [orgUnit, selectedProgram, entityData, page, pageSize]);
+    }, [orgUnit, participantsProgram, entityData, page, pageSize]);
 
     useEffect(() => {
         setPage(1);
-        refetch({page: 1, pageSize: pageSize, program: selectedProgram, orgUnit: orgUnit});
-    }, [orgUnit, selectedProgram]);
+        refetch({page: 1, pageSize: pageSize, program: participantsProgram, orgUnit: orgUnit});
+    }, [orgUnit, participantsProgram]);
 
     useEffect(() => {
-        refetch({page, pageSize: pageSize, program: selectedProgram, orgUnit: orgUnit});
+        refetch({page, pageSize: pageSize, program: participantsProgram, orgUnit: orgUnit});
     }, [pageSize, page])
 
     useEffect(() => {
-        attributesRefetch({program: selectedProgram})
+        attributesRefetch({program: participantsProgram})
         if (attributesData?.attributes?.trackedEntityAttributes) {
             setEntityAttributes(attributesData?.attributes?.trackedEntityAttributes)
         }
-    }, [attributesData, selectedProgram]);
+    }, [attributesData, participantsProgram]);
+
+    useEffect(() => {
+        if (dataTrainingAttributes?.attributes?.trackedEntityAttributes) {
+            setTrainingAttributesData(dataTrainingAttributes?.attributes?.trackedEntityAttributes)
+        }
+    }, [attributesData, trainingProgram]);
 
     useEffect(() => {
         refetchDataElements({id: selectedStage});
@@ -196,18 +231,21 @@ export const EventsComponent = () => {
         pageParticipants(1, participantPageSize);
     }, [participants]);
 
-    /***
-     * Org Units Selection Function. Responsible populating OrgUnitsSelected with selected OrgUnits
-     *
-     */
-    const handleOUChange = event => {
-        setSelectedSharedOrgUnit(event.id);
-        setSelectedOU(event.selected);
-        setSelectedSharedOU(event.selected)
-        if (!event.checked) {
-            setSelectedSharedOrgUnit('')
+    useEffect(() => {
+        if (programAttributes && programAttributes.programs) {
+            const program = programAttributes.programs.programs.find(p => p.id === trainingProgram);
+            if (program) {
+                const attributes = program.programTrackedEntityAttributes.map(tea => {
+                    return {
+                        id: tea.trackedEntityAttribute.id,
+                        valueType: tea.trackedEntityAttribute.valueType
+                    }
+                });
+                setTrainingAttributesData(attributes);
+            }
         }
-    };
+
+    }, [trainingProgram]);
 
     const handleEntityOUChange = event => {
         setOrgUnit(event.id);
@@ -221,17 +259,15 @@ export const EventsComponent = () => {
             configuredStages,
             endDateVisible,
             groupEdit,
-            columnDisplay
+            columnDisplay,
+            trainingAttributes,
+            trainingProgram,
+            participantsProgram,
+            activeStage
         }
         value[type] = data;
-        const mutation = {
-            resource: `dataStore/${config.dataStoreName}/${selectedProgram}`,
-            type: 'update',
-            data: value
-        }
-        engine.mutate(mutation).then(_ => {
-            show({msg: i18n.t('Event successfully saved'), type: 'success'});
-        });
+
+        createOrUpdateDataStore(engine, value, config.dataStoreName, config.dataStoreKey, 'update');
     }
 
     const getParticipant = (entity) => {
@@ -280,38 +316,90 @@ export const EventsComponent = () => {
         setPagedParticipants(currentPage);
     }
 
-    const saveEvent = () => {
-      /*
-      {
-      //"relationship": "pHHu9HUgBJE",
-      // "relationshipName": "Participants - Trainings",
-      // "relationshipType": "iBFMyo4S0Nn",
-   "from": {
-     "trackedEntity": { "trackedEntity": "ABCDEF12345" }//Entity
-   },
-   "to": {
-     "trackedEntity": { "trackedEntity": "FEDCBA12345" } //Training
-   }
-}
-       */
-        const event = {
-            programStage: selectedStage,
-            orgUnit: orgUnit,
-            occurredAt: values[0].date.toISOString(),
-            dataValues: []
+    const attributeMap = () => {
+        return {
+            CUW9TfQpAu6: 'uaQMciOOeWp',
+            KPwanQQE4FU: 'ydubZaoEeMy',
+            CJ7g6K9Ukvf: 'UfMZ6XN7PS7',
+            rlCta8FG2fz: 'e0RUQ4dgkgL'
+        };
+    }
+
+    const saveTraining = () => {
+        const attributes = trainingAttributes.filter(a=> Object.keys(attributeMap()).includes(a)).map(attr => {
+            const valueType = trainingAttributesData.find(ta => ta.id === attr).valueType;
+            let value = groupDataElementValue(attributeMap()[attr]);
+            const uniqueName = `${groupDataElementValue('UfMZ6XN7PS7')}_${new Date(groupDataElementValue('uaQMciOOeWp')).toISOString().substring(0, 10)}_${new Date(groupDataElementValue('ydubZaoEeMy')).toISOString().substring(0, 10)}`
+
+            if (value && valueType) {
+                if (valueType.includes('DATE') ){
+                    value = new Date(value).toISOString()
+                }
+                if (valueType === 'TRUE_ONLY' && !value) {
+                    value = null;
+                }
+            }
+
+            if (attr === 'rlCta8FG2fz') {
+                value = uniqueName;
+            }
+
+            return {
+                valueType,
+                id: attr,
+                value
+            }
+        })
+
+        let relationships = [];
+        if (training && training.length > 0) {
+            relationships = participants.map(p => {
+                return {
+                    relationship: 'pHHu9HUgBJE',
+                    relationshipType: 'iBFMyo4S0Nn',
+                    from: {
+                        trackedEntity: {
+                            trackedEntity: p.trackedEntity
+                        }
+                    },
+                    to: {
+                        trackedEntity: {
+                            trackedEntity: p.trackedEntity
+                        }
+                    }
+                }
+            });
         }
+        const entity = {
+            orgUnit: 'hc4courIKRA',
+            trackedEntityType: entityType,
+            trackedEntity: '',
+            attributes: attributes,
+            relationships: relationships
+        }
+
+        engine.mutate({
+            resource: 'tracker',
+            type: 'create',
+            params: {
+                async: false
+            },
+            data: {
+                trackedEntities: [entity]
+            }
+        }).then((response) => {
+            if (response.status === 'OK') {
+                show({msg: i18n.t('Data successfully updated'), type: 'success'});
+            } else {
+                show({msg: i18n.t('There was an error updating records'), type: 'error'});
+            }
+        });
     }
 
     return (
         <>
             <div className="flex flex-row w-full h-full">
-                <div className="w-2/12 bg-[#f8f4f3] p-4 z-50 transition-transform">
-                    <a href="#" className="flex items-center pb-4 border-b border-b-gray-800">
-
-                        <h2 className="font-bold text-2xl">{MainTitle}</h2>
-                    </a>
-                </div>
-                <div className="w-10/12 ml-4 mr-4 p-4 bg-gray-100 min-h-screen transition-all rounded-md">
+                <div className="page">
                     <Navigation/>
                     <div className="p-6">
                         <div className="mx-auto w-full">
@@ -321,45 +409,18 @@ export const EventsComponent = () => {
                                         <div className="flex flex-row w-full rounded-md bg-white p-3 gap-x-1">
                                             <div className="w-3/12">
                                                 <ProgramStageComponent
-                                                    selectedProgram={selectedProgram}
+                                                    selectedProgram={participantsProgram}
                                                     selectedStage={selectedStage}
                                                     setSelectedStage={(stage) => {
                                                         setSelectedStage(stage)
+                                                        setActiveStage(stage);
+                                                        dataStoreOperation('activeStage', stage);
                                                         setSelectedSharedStage(stage)
                                                     }}
                                                 />
                                             </div>
                                         </div>
                                     </div>
-                                    {Object.keys(filterAttributes).length > 0 &&
-                                        <div className="rounded-md bg-white p-3 mb-2 w-full gap-x-1">
-                                            <label htmlFor="stage"
-                                                   className="block mb-2 text-sm font-medium text-gray-900 dark:text-white border-b-2 border-b-gray-800">
-                                                {i18n.t('Entity Filter')}
-                                            </label>
-                                            <div className="p-2 flex flex-row flex-wrap">
-                                                {filterAttributes.map((attr, idx) => {
-                                                    const entityAttribute = entityAttributes.find(ea => ea.id === attr);
-                                                    if (entityAttribute) {
-                                                        return <>
-                                                            <DataElementComponent key={idx}
-                                                                                  dataElement={attr}
-                                                                                  labelVisible={true}
-                                                                                  value={filterValue[attr]}
-                                                                                  label={entityAttributes.find(a => a.id === attr)?.displayName}
-                                                                                  valueChanged={(_, v) => {
-                                                                                      const filterAttributes = filterValue;
-                                                                                      filterAttributes[attr] = v;
-                                                                                      setFilterValue(filterAttributes);
-
-                                                                                      filterEntities();
-                                                                                  }}/>
-                                                        </>
-                                                    }
-                                                })}
-                                            </div>
-                                        </div>
-                                    }
                                     {selectedStage &&
                                         <div className="flex flex-col w-full mb-2">
                                             {configuredStages[selectedStage] && (configuredStages[selectedStage]['groupDataElements'] || []).length > 0 &&
@@ -387,6 +448,7 @@ export const EventsComponent = () => {
                                                             className="relative overflow-x-auto shadow-md sm:rounded-lg">
                                                             <div className="flex flex-row justify-end">
                                                                 <button type="button"
+                                                                        onClick={saveTraining}
                                                                         className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
                                                                 >Save /Update Event
                                                                 </button>

@@ -18,7 +18,7 @@ export const dataStoreSearchHistoryQueryMore = {
 }
 
 
-export const MainTitle = 'Impact Connect'
+export const MainTitle = 'Tunozegusoma'
 export const ProjectAttributedescription = 'Project Attribute'
 export const searchBoundarySelected = 'Search Selected Organization Unit Tree'
 export const searchBoundaryfull = 'Search Full Organization Unit Tree'

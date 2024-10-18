@@ -6,7 +6,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { config, MainTitle } from '../../consts.js';
 import { provisionOUs, SharedStateContext } from '../../utils.js';
 import { DataElementComponent } from '../DataElement.js';
-import { EventComponent } from '../EventComponent.js';
+import { TrainingsComponent } from '../TrainingsComponent.js';
 import { Navigation } from '../Navigation.js';
 
 export const Main = () => {
@@ -24,12 +24,17 @@ export const Main = () => {
     const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
     const [selectedStage, setSelectedStage] = useState(selectedSharedStage);
     const [dataElements, setDataElements] = useState([]);
+    const [participantsProgram, setParticipantsProgram] = useState('');
+    const [trainingProgram, setTrainingProgram] = useState('');
+    const [eventNameAttribute, setEventNameAttribute] = useState('');
+    const [selectedTraining, setSelectedTraining] = useState('');
     const [orgUnit, setOrgUnit] = useState(selectedSharedOrgUnit);
     const [events, setEvents] = useState([]);
     const [dates, setDates] = useState([new Date()]);
     const [startDate, setStateDate] = useState(new Date());
     const [endDate, setEndDate] = useState(null);
     const [dateEntities, setDateEntities] = useState({});
+    const [trainings, setTrainings] = useState([]);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
     const [entities, setEntities] = useState([]);
@@ -141,6 +146,17 @@ export const Main = () => {
 
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
+    const {data: trainingData} = useDataQuery({
+        entities: {
+            resource: 'tracker/trackedEntities',
+            params: {
+                program: trainingProgram,
+                paging: false,
+                fields: ['*'],
+            }
+        }
+    })
+
     const {
         data: attributesData,
         refetch: attributesRefetch
@@ -155,7 +171,10 @@ export const Main = () => {
                 setConfiguredStages(entry.value.configuredStages || {});
                 setEndDateVisible(entry.value.endDateVisible);
                 setColumnDisplay(entry.value.columnDisplay);
+                setParticipantsProgram(entry.value.participantsProgram);
+                setTrainingProgram(entry.value.trainingProgram);
                 setGroupEdit(entry.value.groupEdit);
+                setEventNameAttribute(entry.value.eventNameAttribute);
             }
         }
     }, [dataStore, selectedProgram]);
@@ -210,6 +229,64 @@ export const Main = () => {
             setEntityAttributes(attributesData?.attributes?.trackedEntityAttributes)
         }
     }, [attributesData, selectedProgram])
+
+    useEffect(() => {
+        if (trainingProgram) {
+            engine.query({
+                trainings: {
+                    resource: 'tracker/trackedEntities',
+                    params: {
+                        program: trainingProgram,
+                        paging: false,
+                        fields: 'attributes,trackedEntity',
+                        orgUnit: 'hc4courIKRA'
+                    }
+                }
+            }).then(res => {
+                if (res && res.trainings) {
+                    const trainings = new Set(res.trainings.instances.flatMap(i => {
+                        return i.attributes.map(attr => {
+                            attr['trackedEntity'] = i.trackedEntity;
+                            return attr;
+                        })
+                    }).filter(attr => attr.attribute === eventNameAttribute).map(attr => {
+                        return {
+                            id: attr.trackedEntity,
+                            label: attr.value
+                        }
+                    }));
+                    setTrainings(Array.from(trainings));
+                }
+            })
+        }
+
+    }, [trainingProgram])
+
+    useEffect(() => {
+        if (selectedTraining) {
+            engine.query({
+                trainings: {
+                    resource: `tracker/trackedEntities/${selectedTraining}`,
+                    params: {
+                        fields: 'relationships(from(trackedEntity(trackedEntity)))',
+                    }
+                }
+            }).then(res => {
+                if (res && res.trainings) {
+                    const ids =  res.trainings.relationships.map(rel => rel.from.trackedEntity.trackedEntity).join(',');
+                    engine.query({
+                        attendees: {
+                            resource: 'tracker/trackedEntities',
+                            params: {
+                                fields: '*',
+                                filter: `trackedEntity:in${ids}`
+                            }
+                        }
+                    })
+                }
+            })
+        }
+    }, [selectedTraining])
 
 
     const dataStoreOperation = (type, data) => {
@@ -594,22 +671,17 @@ export const Main = () => {
     return (
         <>
             <div className="flex flex-row w-full h-full">
-                <div
-                    className="w-2/12 bg-[#f8f4f3] p-4 z-50 transition-transform">
-                    <a href="#" className="flex items-center pb-4 border-b border-b-gray-800">
-
-                        <h2 className="font-bold text-2xl">{MainTitle}</h2>
-                    </a>
-                </div>
-                <div className="w-10/12 ml-4 mr-4 p-4 bg-gray-100 min-h-screen transition-all rounded-md">
+                <div className="page">
                     <Navigation/>
                     <div className="p-6">
                         <div className="mx-auto w-full">
                             <div className="w-full">
                                 <div className="flex flex-col">
-                                    <div className="">
-                                        <EventComponent/>
-                                    </div>
+                                    {trainings && trainings.length > 0 &&
+                                        <div className="w-3/12">
+                                            <TrainingsComponent trainings={trainings} trainingSelected={(training) => setSelectedTraining(training)}/>
+                                        </div>
+                                    }
                                     <div className="flex flex-col w-full mb-2">
                                         {selectedStage &&
                                             <div className="w-full flex flex-col pt-2">
