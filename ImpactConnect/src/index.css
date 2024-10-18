@@ -642,9 +642,6 @@ video {
 .justify-end {
   justify-content: flex-end;
 }
-.justify-center {
-  justify-content: center;
-}
 .gap-1 {
   gap: 0.25rem;
 }
@@ -792,9 +789,6 @@ video {
 }
 .pt-2 {
   padding-top: 0.5rem;
-}
-.pt-3 {
-  padding-top: 0.75rem;
 }
 .text-left {
   text-align: left;

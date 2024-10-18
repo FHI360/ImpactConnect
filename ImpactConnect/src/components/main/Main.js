@@ -47,6 +47,9 @@ export const Main = () => {
     const [filterAttributes, setFilterAttributes] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
     const [entityAttributes, setEntityAttributes] = useState([]);
+    const [configuredCondition, setSelectedConfiguredCondition] = useState([]); 
+
+
     const [attributeOptions, setAttributeOptions] = useState({});
     const [endDateVisible, setEndDateVisible] = useState(false);
     const [groupEdit, setGroupEdit] = useState(false);
@@ -167,6 +170,7 @@ export const Main = () => {
                 setEndDateVisible(entry.value.endDateVisible);
                 setColumnDisplay(entry.value.columnDisplay);
                 setGroupEdit(entry.value.groupEdit);
+                setSelectedConfiguredCondition(entry.value.configuredCondition);
             }
         }
     }, [dataStore, selectedProgram]);
@@ -619,41 +623,81 @@ export const Main = () => {
     }
 
     const individualDataElementsForDates = () => {
+        // Calculate the number of days between the start and end date
+        const daysDifference = datesBetween(startDate, endDate);
         const configuredDataElements = [];
-        switch (datesBetween(startDate, endDate)) {
-            case 1:
-                configuredDataElements.push('xC0qvYXW3kB');
-                break;
-            case 2:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m']);
-                break;
-            case 3:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB']);
-                break;
-            case 4:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw']);
-                break;
-            case 5:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko']);
-                break;
-            case 6:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC']);
-                break;
-            case 7:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9']);
-                break;
-            case 8:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9', 'nz0xDT9pdgw']);
-                break;
-            case 9:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9', 'nz0xDT9pdgw', 'SdP4s8SRDX1']);
-                break;
-            case 10:
-                configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9', 'nz0xDT9pdgw', 'SdP4s8SRDX1', 'aX5CYDBVHBF']);
-                break;
-        }
+        const betweens = configuredCondition?.filter(condition => condition.operator === 'between' )
+        if (betweens){
+            if (betweens.length > 0)                
+                {
+                    betweens.map(ruleItems => {
+                        // Convert value_text to an integer
+                        const value = parseInt(ruleItems.value_text);
+                        // Check if the value is between 1 and 10
+                        if (value >= 1 && value <= 10) {
+                            // Loop through numbers from 1 to the value
+                            for (let i = 1; i <= daysDifference; i++) {
+                                if (value > daysDifference) {
+                                    console.log(`Breaking loop at i = ${i}`);
+                                    break;
+                                }
+                                // Process each number and push dataElement
+                                if (value === 1){
+                                    //initial value for day 1
+                                    configuredDataElements.push(ruleItems.dataElement);
+                                }
+                                else{
+                                    if (value<=daysDifference){
+                                        console.log("adding ", ruleItems.dataElement)
+                                        configuredDataElements.push(...[ruleItems.dataElement]);
+                                    }
+                                    
+                                }                                
 
-        return configuredDataElements;
+                            }
+                        }
+                    })
+
+                }
+        }
+ 
+        // switch (datesBetween(startDate, endDate)) {
+        //     case 1:
+        //         configuredDataElements.push('xC0qvYXW3kB');
+        //         break;
+        //     case 2:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m']);
+        //         break;
+        //     case 3:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB']);
+        //         break;
+        //     case 4:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw']);
+        //         break;
+        //     case 5:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko']);
+        //         break;
+        //     case 6:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC']);
+        //         break;
+        //     case 7:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9']);
+        //         break;
+        //     case 8:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9', 'nz0xDT9pdgw']);
+        //         break;
+        //     case 9:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9', 'nz0xDT9pdgw', 'SdP4s8SRDX1']);
+        //         break;
+        //     case 10:
+        //         configuredDataElements.push(...['xC0qvYXW3kB', 'NOA57B7ry6m', 'wnlNJ6YXPEB', 'wiy7OJe82vw', 'Zl2C1J82Iko', 'swP5ko96SyC', 'pb3dozumaA9', 'nz0xDT9pdgw', 'SdP4s8SRDX1', 'aX5CYDBVHBF']);
+        //         break;
+        // }
+
+        // Before returning the array, remove duplicates using Set
+        const uniqueConfiguredDataElements = [...new Set(configuredDataElements)];
+
+        return uniqueConfiguredDataElements;
     }
 
     const saveGroupTemplate = () => {
@@ -1264,6 +1308,7 @@ export const Main = () => {
                     </button>
                 </ModalActions>
             </Modal>
+
         </>
     )
 }

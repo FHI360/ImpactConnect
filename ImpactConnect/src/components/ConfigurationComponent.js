@@ -3,13 +3,17 @@ import i18n from '@dhis2/d2-i18n';
 import { Transfer } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
 import { config, MainTitle } from '../consts.js';
+import {  IconView24} from '@dhis2/ui-icons'; 
 import ArrowDown from '../icons/arrow-down.svg';
 import ArrowUp from '../icons/arrow-up.svg';
 import { SharedStateContext } from '../utils.js';
 import { Navigation } from './Navigation.js';
 import OrganisationUnitComponent from './OrganisationUnitComponent.js';
+import ConfigureCondition from './ConfigureConditionComponent.js';
 import ProgramComponent from './ProgramComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
+import TooltipComponent from './TooltipComponent.js';
+
 
 const ConfigurationComponent = () => {
     const sharedState = useContext(SharedStateContext)
@@ -36,6 +40,11 @@ const ConfigurationComponent = () => {
     const [selectedDataElements, setSelectedDataElements] = useState([]);
     const [selectedGroupDataElements, setSelectedGroupDataElements] = useState([]);
     const [selectedIndividualDataElements, setSelectedIndividualDataElements] = useState([]);
+    const [showConditionsModal, setShowConditionsModal] =useState(false); 
+    const [selectedCondition, setSelectedConditions] =useState(''); 
+    const [configuredCondition, setSelectedConfiguredCondition] = useState([]); 
+
+
     const [endDateVisible, setEndDateVisible] = useState(false);
     const [groupEdit, setGroupEdit] = useState(false);
     const [editing, setEditing] = useState(false);
@@ -147,12 +156,26 @@ const ConfigurationComponent = () => {
                 setEndDateVisible(entry.value.endDateVisible)
                 setGroupEdit(entry.value.groupEdit);
                 setColumnDisplay(entry.value.columnDisplay);
+                setSelectedConfiguredCondition(entry.value.configuredCondition || []);
+                // console.log("========= ===========");
+                // console.log(entry.value.configuredCondition);
                 const exists = keyExists;
                 exists[selectedProgram] = true;
                 setKeyExists(exists);
             }
         }
     }, [dataStore, selectedProgram]);
+
+    useEffect(() => {
+        if(configuredCondition){
+            if (configuredCondition.length >0 ){
+                dataStoreOperation("configuredCondition", configuredCondition)
+            }
+        }
+
+    },[
+        configuredCondition
+    ])
 
     const handleOUChange = event => {
         setOrgUnit(event.id);
@@ -180,9 +203,11 @@ const ConfigurationComponent = () => {
             configuredStages,
             endDateVisible,
             groupEdit,
-            columnDisplay
+            columnDisplay,
+            configuredCondition
         }
         value[type] = data;
+        console.log(value)
         const mutation = {
             resource: `dataStore/${config.dataStoreName}/${selectedProgram}`,
             type: keyExists[selectedProgram] ? 'update' : 'create',
@@ -228,6 +253,13 @@ const ConfigurationComponent = () => {
         dataStoreOperation('configuredStages', stages);
     }
 
+    const handleConfigureCondition = (connditionID) =>{
+
+        setSelectedConditions(connditionID)
+        setShowConditionsModal(true)
+
+    }
+
     return (
         <>
             <div className="flex flex-row w-full h-full">
@@ -241,6 +273,7 @@ const ConfigurationComponent = () => {
                         handleOUChange={handleOUChange}
                         selectedOU={selectedOU}
                     />
+
                 </div>
                 <div className="w-10/12 ml-4 mr-4 p-4 bg-gray-200 min-h-screen transition-all rounded-md">
                     <Navigation/>
@@ -812,7 +845,21 @@ const ConfigurationComponent = () => {
                                                                             </div>
                                                                         </td>
                                                                         <td>{index + 1}</td>
-                                                                        <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{dataElement.name}</td>
+                                                                        <td className="text-left px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                                                        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '10px' }}>
+                                                                            {dataElement.name}
+                                                                            <TooltipComponent 
+                                                                                    IconType={IconView24} 
+                                                                                    btnFunc={handleConfigureCondition}
+                                                                                    conditionID={dataElement.id}
+                                                                                    // conditionID={selectedCondition}
+                                                                                    dynamicText="Rule"
+                                                                                    buttonMode="secondary"
+                                                                                    customIcon={true}
+                                                                                    disabled={false}
+                                                                                    />
+                                                                        </div>
+                                                                        </td>
                                                                     </tr>
                                                                 </>
                                                             })}
@@ -945,6 +992,16 @@ const ConfigurationComponent = () => {
                     </div>
                 </div>
             </div>
+            {showConditionsModal && 
+                      (
+                        <ConfigureCondition
+                            dataElements={dataElements} 
+                            selectedCondition={selectedCondition}
+                            configuredCondition={configuredCondition}
+                            setShowConditionsModal={setShowConditionsModal}
+                            setSelectedConfiguredCondition={setSelectedConfiguredCondition}
+                        />                    
+                  )}
         </>
     )
 }
