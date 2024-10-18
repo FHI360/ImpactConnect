@@ -1,9 +1,9 @@
+import PropTypes from 'prop-types';
 import React, { useEffect, useState } from 'react';
-import { DataElementComponent } from './DataElement';
+import { DataElementComponent } from './DataElement.js';
 
-export const EventComponent = ({}) => {
-    const [events, setEvents] = useState([]);
-    const [selectedEvent, setSelectedEvent] = useState('');
+export const TrainingsComponent = ({trainings, trainingSelected}) => {
+    const [selectedTraining, setSelectedTraining] = useState('');
     const [collapsed, setCollapsed] = useState(false);
     const [dataElements, setDataElements] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
@@ -12,7 +12,7 @@ export const EventComponent = ({}) => {
 
     useEffect(() => {
 
-    }, [selectedEvent]);
+    }, [selectedTraining]);
 
     const groupDataElementValue = (dataElement) => {
         return groupValues[dataElement];
@@ -23,25 +23,28 @@ export const EventComponent = ({}) => {
             <div className="pb-2">
                 <label htmlFor="program"
                        className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                    Event
+                    Training
                 </label>
                 <select
                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                    value={selectedEvent}
-                    onChange={(event) => setSelectedEvent(event.target.value)}>
+                    value={selectedTraining}
+                    onChange={(event) => {
+                        setSelectedTraining(event.target.value);
+                        trainingSelected(event.target.value);
+                    }}>
                     <option
                         selected>Select one
                     </option>
-                    {events.map(option => {
+                    {trainings.map(option => {
                             return <>
                                 <option
-                                    value={option.code}>{option.displayName}</option>
+                                    value={option.id}>{option.label}</option>
                             </>
                         }
                     )}
                 </select>
             </div>
-            {selectedEvent &&
+            {selectedTraining &&
             <div className="p-2">
                 <h2 onClick={() => setCollapsed(!collapsed)}>
                     <button type="button"
@@ -98,3 +101,8 @@ export const EventComponent = ({}) => {
         </>
     )
 }
+
+TrainingsComponent.propTypes = {
+    trainingSelected: PropTypes.func,
+    trainings: PropTypes.array
+};
