@@ -1,72 +1,28 @@
-import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
+import { useDataEngine } from '@dhis2/app-runtime';
 import PropTypes from 'prop-types';
 import React, { useEffect, useState } from 'react';
-import { config } from '../consts.js';
-import { dataStoreQuery } from '../utils.js';
 import { DataElementComponent } from './DataElement.js';
 
 export const TrainingsComponent = ({trainings, trainingSelected}) => {
     const engine = useDataEngine();
     const [selectedTraining, setSelectedTraining] = useState('');
     const [collapsed, setCollapsed] = useState(false);
-    const [dataElements, setDataElements] = useState([]);
-    const [configuredStages, setConfiguredStages] = useState({});
-    const [groupValues, setGroupValues] = useState({});
-    const [selectedStage, setSelectedStage] = useState('');
+    const [attributes, setAttributes] = useState([]);
 
-    const {data: dataStore} = useDataQuery(dataStoreQuery);
-
-    const dataElementsQuery = {
-        programStage: {
-            resource: `programStages`,
-            params: ({
-                fields: 'programStageDataElements(dataElement(id, name, valueType))'
+    useEffect(() => {
+        if (selectedTraining) {
+            engine.query({
+                trainings: {
+                    resource: `tracker/trackedEntities/${selectedTraining}`,
+                    params: {
+                        fields: 'attributes',
+                    }
+                }
+            }).then(res => {
+                setAttributes(res.trainings.attributes);
             })
         }
-    }
-
-    const {
-        data
-    } = useDataQuery(dataElementsQuery);
-
-    useEffect(() => {
-        if (data && data.programStage && data.programStage.programStages) {
-            const dataElements = data.programStage.programStages?.flatMap(data => data.programStageDataElements.map(psde => psde.dataElement));
-            setDataElements(dataElements);
-        }
-    }, [data]);
-
-    useEffect(() => {
-        if (dataStore?.dataStore?.entries) {
-            const entry = dataStore.dataStore.entries.find(e => e.key === `${config.dataStoreKey}`);
-            if (entry) {
-                setConfiguredStages(entry.value.configuredStages || {
-                    dataElements: [],
-                    individualDataElements: [],
-                    groupDataElements: [],
-                });
-
-                setSelectedStage('SmUprI011oN')
-            }
-        }
-    }, [dataStore]);
-
-    useEffect(() => {
-        engine.query({
-            trainings: {
-                resource: `tracker/trackedEntities/${selectedTraining}`,
-                params: {
-                    fields: 'attributes',
-                }
-            }
-        }).then(res => {
-          console.log('Training', res)
-        })
     }, [selectedTraining]);
-
-    const groupDataElementValue = (dataElement) => {
-        return groupValues[dataElement];
-    }
 
     return (
         <>
@@ -83,7 +39,7 @@ export const TrainingsComponent = ({trainings, trainingSelected}) => {
                         trainingSelected(event.target.value);
                     }}>
                     <option
-                        selected>Select one
+                        selected>Select training
                     </option>
                     {trainings.map(option => {
                             return <>
@@ -123,18 +79,18 @@ export const TrainingsComponent = ({trainings, trainingSelected}) => {
                     <div className={collapsed ? '' : 'hidden'}>
                         <div
                             className="bg-white border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-                            {configuredStages[selectedStage] && (configuredStages[selectedStage]['groupDataElements'] || []).length > 0 &&
+                            {(attributes || []).length > 0 &&
                                 <div className="w-full flex flex-col pt-2">
                                     <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
                                         <div
                                             className="relative overflow-x-auto shadow-md sm:rounded-lg">
                                             <div className="w-3/12 p-2">
-                                                {dataElements.length > 0 && (configuredStages[selectedStage]['groupDataElements'] || []).map((cde, idx) => {
-                                                    const de = dataElements.find(de => de.id === cde);
+                                                {attributes.map((attr, idx) => {
                                                     return <>
                                                         <DataElementComponent key={idx}
-                                                                              value={groupDataElementValue(cde)}
-                                                                              dataElement={de}
+                                                                              value={attr.value}
+                                                                              label={attr.displayName}
+                                                                              dataElement={attr}
                                                                               labelVisible={true}
                                                                               readonly={true}/>
                                                     </>

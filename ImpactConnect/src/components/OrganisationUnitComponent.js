@@ -32,6 +32,7 @@ const OrganisationUnitComponent = ({ handleOUChange, selectedOU }) => {
                     onChange={handleOUChange}
                     roots={[data['results']['organisationUnits'][0]['id']]}
                     selected={selectedOU}
+                    singleSelection={true}
                 />
             </div>
         </div>
