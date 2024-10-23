@@ -2,6 +2,7 @@ import React, { createContext, useState, useCallback } from 'react';
 import classes from './App.module.css'
 import refresh from './icons/refresh.png'
 import search from './icons/search.png'
+import { config } from './consts';
 
 export const customImage = (source, size = 'small') => {
 
@@ -379,4 +380,25 @@ export const useSharedState = () => {
 export const paginate = (array, pageNumber, pageSize) => {
     const startIndex = (pageNumber - 1) * pageSize;
     return array.slice(startIndex, startIndex + pageSize);
+}
+
+export const dataStoreQuery = {
+    dataStore: {
+        resource: `dataStore/${config.dataStoreName}?fields=.`,
+    }
+};
+
+export const getParticipant = (entity, nameAttributes) => {
+    return nameAttributes.map(attr => {
+        return entity.enrollments[0].attributes?.find(attribute => attribute.attribute === attr)?.value
+    }).join(' ')
+}
+
+export const formatDate = (date) => {
+    if (!date) {
+        return null;
+    }
+    return new Intl.DateTimeFormat('en-GB', {
+        dateStyle: 'medium',
+    }).format(new Date(date));
 }

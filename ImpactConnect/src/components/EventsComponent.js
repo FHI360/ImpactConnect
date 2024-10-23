@@ -3,7 +3,7 @@ import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
 import { config, MainTitle } from '../consts.js';
-import { createOrUpdateDataStore, paginate, SharedStateContext } from '../utils.js';
+import { createOrUpdateDataStore, getParticipant, paginate, SharedStateContext } from '../utils.js';
 import { DataElementComponent } from './DataElement.js';
 import { Navigation } from './Navigation.js';
 import OrganisationUnitComponent from './OrganisationUnitComponent.js';
@@ -270,12 +270,6 @@ export const EventsComponent = () => {
         createOrUpdateDataStore(engine, value, config.dataStoreName, config.dataStoreKey, 'update');
     }
 
-    const getParticipant = (entity) => {
-        return nameAttributes.map(attr => {
-            return entity.enrollments[0].attributes?.find(attribute => attribute.attribute === attr)?.value
-        }).join(' ')
-    }
-
     const addSelection = () => {
         const _participants = participants.filter(entity => !participants.find(participant => participant.trackedEntity
             === entity.trackedEntity));
@@ -502,7 +496,7 @@ export const EventsComponent = () => {
                                                                     return <>
                                                                         <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
                                                                             <td>{index + 1}</td>
-                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity)}</td>
+                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
                                                                             <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
                                                                             <td>
                                                                                 <button type="button"
@@ -621,7 +615,7 @@ export const EventsComponent = () => {
                                                                                     </div>
                                                                                 </td>
                                                                                 <td>{index + 1}</td>
-                                                                                <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity)}</td>
+                                                                                <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
                                                                                 <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
                                                                             </tr>
                                                                         </>

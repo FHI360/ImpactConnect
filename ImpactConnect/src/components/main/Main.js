@@ -3,11 +3,11 @@ import i18n from '@dhis2/d2-i18n';
 import { Modal, ModalActions, ModalContent, ModalTitle } from '@dhis2/ui';
 import classnames from 'classnames';
 import React, { useContext, useEffect, useState } from 'react';
-import { config, MainTitle } from '../../consts.js';
-import { provisionOUs, SharedStateContext } from '../../utils.js';
+import { config } from '../../consts.js';
+import { formatDate, getParticipant, provisionOUs, SharedStateContext } from '../../utils.js';
 import { DataElementComponent } from '../DataElement.js';
-import { TrainingsComponent } from '../TrainingsComponent.js';
 import { Navigation } from '../Navigation.js';
+import { TrainingsComponent } from '../TrainingsComponent.js';
 
 export const Main = () => {
     const engine = useDataEngine();
@@ -55,6 +55,7 @@ export const Main = () => {
     const [modalShow, setModalShow] = useState(false);
     const [confirmShow, setConfirmShow] = useState(false);
     const [templateName, setTemplateName] = useState('');
+    const [pagedParticipants, setPagedParticipants] = useState([]);
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -273,16 +274,27 @@ export const Main = () => {
                 }
             }).then(res => {
                 if (res && res.trainings) {
-                    const ids =  res.trainings.relationships.map(rel => rel.from.trackedEntity.trackedEntity).join(',');
-                    engine.query({
-                        attendees: {
-                            resource: 'tracker/trackedEntities',
-                            params: {
-                                fields: '*',
-                                filter: `trackedEntity:in${ids}`
-                            }
-                        }
-                    })
+                    const ids = res.trainings.relationships.map(rel => rel.from.trackedEntity.trackedEntity).join(',');
+                    if (ids) {
+                        ids.split(',').forEach(id => {
+                            engine.query({
+                                attendee: {
+                                    resource: 'tracker/trackedEntities',
+                                    id,
+                                    params: {
+                                        fields: '*',
+                                    }
+                                }
+                            }).then(attendee => {
+                                setEntities([...entities, attendee.attendee]);
+                                setPagedParticipants([...entities, attendee.attendee]);
+
+                                console.log('[...entities, attendee.attendee]', [...entities, attendee.attendee])
+                            });
+                        })
+
+                        console.log('Finished')
+                    }
                 }
             })
         }
@@ -349,21 +361,6 @@ export const Main = () => {
         } else {
             return 1;
         }
-    }
-
-    const formatDate = (date) => {
-        if (!date) {
-            return null;
-        }
-        return new Intl.DateTimeFormat('en-GB', {
-            dateStyle: 'medium',
-        }).format(new Date(date));
-    }
-
-    const getParticipant = (entity) => {
-        return nameAttributes.map(attr => {
-            return entity.enrollments[0].attributes?.find(attribute => attribute.attribute === attr)?.value
-        }).join(' ')
     }
 
     const groupDataElementValue = (dataElement) => {
@@ -678,12 +675,13 @@ export const Main = () => {
                             <div className="w-full">
                                 <div className="flex flex-col">
                                     {trainings && trainings.length > 0 &&
-                                        <div className="w-3/12">
-                                            <TrainingsComponent trainings={trainings} trainingSelected={(training) => setSelectedTraining(training)}/>
+                                        <div className="w-full">
+                                            <TrainingsComponent trainings={trainings}
+                                                                trainingSelected={(training) => setSelectedTraining(training)}/>
                                         </div>
                                     }
                                     <div className="flex flex-col w-full mb-2">
-                                        {selectedStage &&
+                                        {entities.length > 0 &&
                                             <div className="w-full flex flex-col pt-2">
                                                 <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
                                                     <div
@@ -697,11 +695,11 @@ export const Main = () => {
 
                                                                 </p>
                                                                 <div className="flex flex-row justify-end">
-                                                                    <button type="button"
+                                                                    {/*<button type="button"
                                                                             className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
                                                                             onClick={() => setConfirmShow(true)}>Reload
                                                                         records
-                                                                    </button>
+                                                                    </button>*/}
                                                                     {edits.length !== 0 && selectedEntities.length > 0 &&
                                                                         <button type="button"
                                                                                 className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
@@ -713,7 +711,7 @@ export const Main = () => {
                                                             <thead
                                                                 className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                                             <tr>
-                                                                <th className="px-6 py-6">
+                                                                <th className="px-6 py-6 w-1/12">
                                                                     <div
                                                                         className="flex items-center mb-4">
                                                                         <input
@@ -730,9 +728,9 @@ export const Main = () => {
                                                                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
                                                                     </div>
                                                                 </th>
-                                                                <th data-priority="1" className="px-6 py-3">#
+                                                                <th data-priority="1" className="px-6 py-3 w-1/12">#
                                                                 </th>
-                                                                <th data-priority="2" className="px-6 py-3">Profile
+                                                                <th data-priority="2" className="px-6 py-3 w-3/12">Profile
                                                                 </th>
                                                                 <th data-priority="3"
                                                                     className="px-6 py-3 mx-auto text-center"
@@ -743,7 +741,6 @@ export const Main = () => {
                                                                 {individualDataElementsForDates().map((id, idx) => {
                                                                     const de = dataElements.find(e => e.id === id)
                                                                     return <th key={idx}
-                                                                               rowSpan={7}
                                                                                className="px-6 py-3">
                                                                         <div
                                                                             className="text-left -rotate-90 w-16 pb-4">{de?.name}</div>
@@ -752,7 +749,7 @@ export const Main = () => {
                                                             </tr>
                                                             </thead>
                                                             <tbody>
-                                                            {entities.map((entity, index) => {
+                                                            {pagedParticipants.map((entity, index) => {
                                                                 return <>
                                                                     <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
                                                                         <td className="px-6 py-6">
@@ -786,7 +783,7 @@ export const Main = () => {
                                                                             </div>
                                                                         </td>
                                                                         <td>{index + 1}</td>
-                                                                        <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity)}</td>
+                                                                        <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
                                                                         {dataElements.length > 0 && individualDataElementsForDates().map((cde, idx2) => {
                                                                             const de = dataElements.find(de => de.id === cde);
                                                                             return <>
