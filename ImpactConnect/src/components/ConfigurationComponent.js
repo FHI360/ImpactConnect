@@ -2,7 +2,7 @@ import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Transfer } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
-import { config, MainTitle } from '../consts.js';
+import { config } from '../consts.js';
 import ArrowDown from '../icons/arrow-down.svg';
 import ArrowUp from '../icons/arrow-up.svg';
 import { createOrUpdateDataStore, SharedStateContext } from '../utils.js';
@@ -37,7 +37,7 @@ const ConfigurationComponent = () => {
     const [selectedGroupDataElements, setSelectedGroupDataElements] = useState([]);
     const [selectedIndividualDataElements, setSelectedIndividualDataElements] = useState([]);
     const [endDateVisible, setEndDateVisible] = useState(false);
-    const [groupEdit, setGroupEdit] = useState(false);
+    const [groupEdit, setGroupEdit] = useState(true);
     const [editing, setEditing] = useState(false);
     const [configure1, setConfigure1] = useState(false);
     const [configure2, setConfigure2] = useState(false);
@@ -294,7 +294,7 @@ const ConfigurationComponent = () => {
                                     <div className="card">
                                         <div className="w-3/12">
                                             <label className="label">
-                                                Event Name Attribute
+                                                Event Unique Name Attribute
                                             </label>
                                             <select className="select"
                                                     value={eventNameAttribute}
@@ -380,7 +380,7 @@ const ConfigurationComponent = () => {
                                     </select>
                                 </div>
                             </div>*/}
-                            <div className="card">
+                            {/*<div className="card">
                                 <div
                                     className="flex items-center">
                                     <input
@@ -390,13 +390,13 @@ const ConfigurationComponent = () => {
                                             setEndDateVisible(payload.target.checked);
                                             dataStoreOperation('endDateVisible', payload.target.checked);
                                         }}
-                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                        className="checkbox"/>
                                     <label
                                         className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
                                         {i18n.t('End Date Visible?')}
                                     </label>
                                 </div>
-                            </div>
+                            </div>*/}
                             <div className="card">
                                 <div
                                     className="flex items-center">
@@ -414,7 +414,7 @@ const ConfigurationComponent = () => {
                                     </label>
                                 </div>
                             </div>
-                            <div className="card">
+                            {/*<div className="card">
                                 <div
                                     className="flex items-center">
                                     <input
@@ -430,7 +430,7 @@ const ConfigurationComponent = () => {
                                         {i18n.t('Display Data Elements as columns in table?')}
                                     </label>
                                 </div>
-                            </div>
+                            </div>*/}
                             <div className="shadow-sm rounded-md p-2 bg-white mb-2">
                                 <div className="w-3/12">
                                     <ProgramComponent
@@ -441,8 +441,8 @@ const ConfigurationComponent = () => {
                                 </div>
                             </div>
                             <div className="card border-blue-100">
-                                <label className="label">
-                                    {i18n.t(groupEdit ? 'Configure Group Action Data Elements' : 'Configure Data Elements')}
+                                {/*<label className="label">
+                                    {i18n.t(groupEdit ? 'Configure Program Attributes' : 'Configure Data Elements')}
                                 </label>
                                 <div className="shadow-md rounded-md p-4 bg-white mb-4">
                                     <label htmlFor="program"
@@ -757,13 +757,13 @@ const ConfigurationComponent = () => {
                                             </div>
                                         </div>
                                     </div>
-                                }
+                                }*/}
                             </div>
                             {groupEdit &&
                                 <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
                                     <label htmlFor="program"
                                            className="block mb-2 text-sm font-semibold text-gray-900 dark:text-white">
-                                        {i18n.t('Configure Individual Data Elements')}
+                                        {i18n.t('Configure Participant\'s Data Elements')}
                                     </label>
                                     <div className="shadow-md rounded-md p-4 bg-white mb-4">
                                         <label htmlFor="program"

@@ -3,7 +3,7 @@ import { CalendarInput } from '@dhis2/ui';
 import PropTypes from 'prop-types';
 import React, { useState } from 'react';
 
-export const DataElementComponent = ({dataElement, labelVisible, label, value, valueChanged, readonly}) => {
+export const DataElementComponent = ({dataElement, labelVisible = true, label, value, valueChanged, readonly}) => {
     const engine = useDataEngine();
     const [attributeOptions, setAttributeOptions] = useState({})
     return (
@@ -29,7 +29,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                             <div className="">
                                 {labelVisible &&
                                     <label className="label">
-                                        {label || de.name}
+                                        {label || de.name || de.displayName}
                                     </label>
                                 }
                                 <select className="select"
@@ -39,7 +39,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     <option
                                         selected>Select one
                                     </option>
-                                    {(attributeOptions[de.id] || []).map(option => {
+                                    {(attributeOptions[de.id] || []).filter(option => !!option).map(option => {
                                             return <>
                                                 <option
                                                     value={option.code}>{option.displayName}</option>
@@ -59,10 +59,10 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                         disabled={readonly}
                                         checked={value === true || value === 'true'}
                                         onChange={(event) => valueChanged(de, event.target.checked)}
-                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                        className="checkbox"/>
                                     {labelVisible &&
                                         <label className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
-                                            {label || de.name}
+                                            {label || de.name || de.displayName}
                                         </label>
                                     }
                                 </div>
@@ -74,7 +74,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     className="mb-5">
                                     {labelVisible &&
                                         <label className="text-left label">
-                                            {label || de.name}
+                                            {label || de.name || de.displayName}
                                         </label>
                                     }
                                     <input
@@ -92,14 +92,17 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     className="mb-5">
                                     {labelVisible &&
                                         <label className="text-left label">
-                                            {label || de.name}
+                                            {label || de.name || de.displayName}
                                         </label>
                                     }
                                     <input
                                         type="text"
                                         value={value}
                                         disabled={readonly}
-                                        onChange={(event) => valueChanged(de, event.target.value)}
+                                        onChange={(event) => {
+                                            console.log('Change', event.target.value, event)
+                                            valueChanged(de, event.target.value)
+                                        }}
                                         className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
                                 </div>
                             </>
@@ -110,7 +113,7 @@ export const DataElementComponent = ({dataElement, labelVisible, label, value, v
                                     className="mb-5 flex flex-col">
                                     {labelVisible &&
                                         <label className="text-left label">
-                                            {label || de.name}
+                                            {label || de.name || de.displayName}
                                         </label>
                                     }
                                     <CalendarInput
