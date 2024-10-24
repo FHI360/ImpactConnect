@@ -2,12 +2,20 @@ import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
-import { config, MainTitle } from '../consts.js';
-import { createOrUpdateDataStore, getParticipant, paginate, SharedStateContext } from '../utils.js';
+import { config } from '../consts.js';
+import {
+    createOrUpdateDataStore,
+    fetchEntities,
+    getParticipant,
+    isObjectEmpty,
+    paginate,
+    SharedStateContext,
+    trackerCreate,
+    trackerDelete
+} from '../utils.js';
 import { DataElementComponent } from './DataElement.js';
 import { Navigation } from './Navigation.js';
 import OrganisationUnitComponent from './OrganisationUnitComponent.js';
-import ProgramStageComponent from './ProgramStageComponent.js';
 
 export const EventsComponent = () => {
     const engine = useDataEngine();
@@ -19,6 +27,10 @@ export const EventsComponent = () => {
     } = sharedState;
 
     const [selectedStage, setSelectedStage] = useState(selectedSharedStage);
+    const [venue, setVenue] = useState();
+    const [selectedVenue, setSelectedVenue] = useState('');
+    const [trainings, setTrainings] = useState([]);
+    const [selectedTraining, setSelectedTraining] = useState('');
     const [dataElements, setDataElements] = useState([]);
     const [entityType, setEntityType] = useState('');
     const [orgUnit, setOrgUnit] = useState('');
@@ -35,10 +47,9 @@ export const EventsComponent = () => {
     const [nameAttributes, setNameAttributes] = useState([]);
     const [filterAttributes, setFilterAttributes] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
-    const [entityAttributes, setEntityAttributes] = useState([]);
+    const [eventNameAttribute, setEventNameAttribute] = useState('');
     const [page, setPage] = useState(1);
-    const [totalEntities, setTotalEntites] = useState(0);
-    const [training, setTraining] = useState('');
+    const [totalEntities, setTotalEntities] = useState(0);
     const [pageSize, setPageSize] = useState(50);
     const [participantPageSize, setParticipantPageSize] = useState(50);
     const [participantsPage, setParticipantsPage] = useState(0);
@@ -48,6 +59,9 @@ export const EventsComponent = () => {
     const [columnDisplay, setColumnDisplay] = useState(false);
     const [groupValues, setGroupValues] = useState({});
     const [orgUnits, setOrgUnits] = useState([]);
+    const [events, setEvents] = useState([]);
+    const [event, setEvent] = useState({});
+    const [saving, setSaving] = useState(false);
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -92,7 +106,7 @@ export const EventsComponent = () => {
                     page: page,
                     paging: true,
                     totalPages: true,
-                    fields: ['*'],
+                    fields: 'trackedEntity,attributes,orgUnit',
                 })
             }
         }
@@ -107,11 +121,6 @@ export const EventsComponent = () => {
             })
         }
     }
-
-    const {
-        data: attributesData,
-        refetch: attributesRefetch
-    } = useDataQuery(attributesQuery, {variables: {program: participantsProgram}});
 
     const {
         data: dataTrainingAttributes,
@@ -170,6 +179,7 @@ export const EventsComponent = () => {
                 setGroupEdit(entry.value.groupEdit);
                 setActiveStage(entry.value.activeStage);
                 setSelectedStage(entry.value.activeStage);
+                setEventNameAttribute(entry.value.eventNameAttribute)
             }
         }
     }, [dataStore]);
@@ -178,7 +188,7 @@ export const EventsComponent = () => {
         if (orgUnitsData && orgUnitsData.orgUnits) {
             setOrgUnits(orgUnitsData.orgUnits.organisationUnits);
         }
-    }, []);
+    }, [orgUnitsData]);
 
     useEffect(() => {
         if (programData && programData.programs) {
@@ -190,10 +200,10 @@ export const EventsComponent = () => {
         if (entityData && entityData.entities) {
             setAllEntities(entityData.entities.instances);
             setEntities(entityData.entities.instances);
-            setTotalEntites(entityData.entities.total);
+            setTotalEntities(entityData.entities.total);
         } else {
             setEntities([]);
-            setTotalEntites(0);
+            setTotalEntities(0);
         }
     }, [orgUnit, participantsProgram, entityData, page, pageSize]);
 
@@ -207,17 +217,10 @@ export const EventsComponent = () => {
     }, [pageSize, page])
 
     useEffect(() => {
-        attributesRefetch({program: participantsProgram})
-        if (attributesData?.attributes?.trackedEntityAttributes) {
-            setEntityAttributes(attributesData?.attributes?.trackedEntityAttributes)
-        }
-    }, [attributesData, participantsProgram]);
-
-    useEffect(() => {
         if (dataTrainingAttributes?.attributes?.trackedEntityAttributes) {
             setTrainingAttributesData(dataTrainingAttributes?.attributes?.trackedEntityAttributes)
         }
-    }, [attributesData, trainingProgram]);
+    }, [trainingAttributesData, trainingProgram]);
 
     useEffect(() => {
         refetchDataElements({id: selectedStage});
@@ -247,9 +250,66 @@ export const EventsComponent = () => {
 
     }, [trainingProgram]);
 
-    const handleEntityOUChange = event => {
+    useEffect(() => {
+        if (trainingProgram && selectedVenue) {
+            fetchEvents().then(eventData => {
+                if (eventData && eventData.events) {
+                    setEvents(eventData.events.instances);
+
+                    const trainings = new Set(eventData.events.instances.flatMap(i => {
+                        return i.attributes.map(attr => {
+                            attr['trackedEntity'] = i.trackedEntity;
+                            return attr;
+                        })
+                    }).filter(attr => attr.attribute === eventNameAttribute).map(attr => {
+                        return {
+                            id: attr.trackedEntity,
+                            label: attr.value
+                        }
+                    }));
+                    setTrainings(Array.from(trainings));
+                }
+            })
+        }
+
+    }, [entityType, selectedVenue]);
+
+    useEffect(() => {
+        const training = events.find(evt => evt.trackedEntity === selectedTraining);
+        if (training) {
+            const values = {};
+            training.attributes.forEach(attr => {
+                values[attr.attribute] = attr.value;
+            })
+            setGroupValues(values);
+
+            const ids = training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
+            if (ids.length > 0) {
+                fetchEntities(engine, ids, 'trackedEntity,orgUnit,attributes').then(value => {
+                    const attendees = value.map(v => v.entity);
+                    setParticipants(attendees);
+                });
+            }
+        }
+
+        if (selectedTraining) {
+            fetchEntities(engine, [selectedTraining], '*').then(value => {
+                const trainings = value.map(v => v.entity);
+                if (trainings && trainings.length) {
+                    setEvent(trainings[0])
+                }
+            });
+        }
+    }, [selectedTraining]);
+
+    const orgUnitChanged = event => {
         setOrgUnit(event.id);
         setSelectedOu(event.selected)
+    }
+
+    const handleVenueChange = event => {
+        setSelectedVenue(event.id);
+        setVenue(event.selected)
     }
 
     const dataStoreOperation = (type, data) => {
@@ -263,7 +323,8 @@ export const EventsComponent = () => {
             trainingAttributes,
             trainingProgram,
             participantsProgram,
-            activeStage
+            activeStage,
+            eventNameAttribute
         }
         value[type] = data;
 
@@ -271,14 +332,14 @@ export const EventsComponent = () => {
     }
 
     const addSelection = () => {
-        const _participants = participants.filter(entity => !participants.find(participant => participant.trackedEntity
+        const _participants = participants.filter(entity => !selectedEntities.find(participant => participant.trackedEntity
             === entity.trackedEntity));
         _participants.push(...selectedEntities);
         setParticipants([..._participants]);
     }
 
-    const groupDataElementValue = (dataElement) => {
-        return groupValues[dataElement];
+    const groupDataElementValue = (attribute) => {
+        return groupValues[attribute];
     }
 
     const createOrUpdateGroupEvent = (dataElement, value) => {
@@ -304,29 +365,24 @@ export const EventsComponent = () => {
         setEntities(entities);
     }
 
+    const uniqueName = () => {
+        return `${groupDataElementValue('CJ7g6K9Ukvf')}_${new Date(groupDataElementValue('CUW9TfQpAu6')).toISOString().substring(0, 10)}_${new Date(groupDataElementValue('KPwanQQE4FU')).toISOString().substring(0, 10)}`
+    }
+
     const pageParticipants = (page = 1, size = participantPageSize) => {
         setParticipantsPage(page);
         const currentPage = paginate(participants, page, size);
         setPagedParticipants(currentPage);
     }
 
-    const attributeMap = () => {
-        return {
-            CUW9TfQpAu6: 'uaQMciOOeWp',
-            KPwanQQE4FU: 'ydubZaoEeMy',
-            CJ7g6K9Ukvf: 'UfMZ6XN7PS7',
-            rlCta8FG2fz: 'e0RUQ4dgkgL'
-        };
-    }
-
-    const saveTraining = () => {
-        const attributes = trainingAttributes.filter(a=> Object.keys(attributeMap()).includes(a)).map(attr => {
+    const saveTraining = async () => {
+        setSaving(true);
+        const attributes = trainingAttributes.map(attr => {
             const valueType = trainingAttributesData.find(ta => ta.id === attr).valueType;
-            let value = groupDataElementValue(attributeMap()[attr]);
-            const uniqueName = `${groupDataElementValue('UfMZ6XN7PS7')}_${new Date(groupDataElementValue('uaQMciOOeWp')).toISOString().substring(0, 10)}_${new Date(groupDataElementValue('ydubZaoEeMy')).toISOString().substring(0, 10)}`
+            let value = groupDataElementValue(attr);
 
             if (value && valueType) {
-                if (valueType.includes('DATE') ){
+                if (valueType.includes('DATE')) {
                     value = new Date(value).toISOString()
                 }
                 if (valueType === 'TRUE_ONLY' && !value) {
@@ -334,58 +390,145 @@ export const EventsComponent = () => {
                 }
             }
 
-            if (attr === 'rlCta8FG2fz') {
-                value = uniqueName;
+            if (attr === eventNameAttribute) {
+                value = uniqueName();
             }
 
             return {
                 valueType,
-                id: attr,
+                attribute: attr,
                 value
             }
+        });
+
+        attributes.push({
+            attribute: 'oIZRuzzHXxa',
+            value: 4
+        })
+        attributes.push({
+            attribute: 'tdhHgS70Vkk',
+            value: '20'
         })
 
-        let relationships = [];
-        if (training && training.length > 0) {
-            relationships = participants.map(p => {
-                return {
-                    relationship: 'pHHu9HUgBJE',
-                    relationshipType: 'iBFMyo4S0Nn',
-                    from: {
-                        trackedEntity: {
-                            trackedEntity: p.trackedEntity
-                        }
-                    },
-                    to: {
-                        trackedEntity: {
-                            trackedEntity: p.trackedEntity
-                        }
-                    }
-                }
-            });
-        }
-        const entity = {
-            orgUnit: 'hc4courIKRA',
+        let entity = {
+            orgUnit: selectedVenue,
             trackedEntityType: entityType,
-            trackedEntity: '',
+            trackedEntity: selectedTraining,
             attributes: attributes,
-            relationships: relationships
+            enrollments: [
+                {
+                    program: trainingProgram,
+                    orgUnit: selectedVenue,
+                    status: 'ACTIVE',
+                    occurredAt: new Date().toISOString(),
+                    enrolledAt: new Date().toISOString(),
+                    attributes
+                }
+            ]
         }
 
-        engine.mutate({
-            resource: 'tracker',
-            type: 'create',
-            params: {
-                async: false
-            },
-            data: {
-                trackedEntities: [entity]
+        let trackedEntity = selectedTraining;
+
+        if (event && !isObjectEmpty(event)) {
+            event.enrollments[0].attributes = attributes;
+            event.attributes = attributes;
+            entity = event;
+        }
+        const response = await trackerCreate(engine, {
+            trackedEntities: [entity]
+        });
+        if (!response) {
+            show({msg: i18n.t('There was an error updating records'), type: 'error'});
+        } else {
+            if (response.TRACKED_ENTITY) {
+                trackedEntity = response?.TRACKED_ENTITY?.objectReports[0].uid;
             }
-        }).then((response) => {
-            if (response.status === 'OK') {
-                show({msg: i18n.t('Data successfully updated'), type: 'success'});
-            } else {
-                show({msg: i18n.t('There was an error updating records'), type: 'error'});
+            if (trackedEntity) {
+                saveRelationships(trackedEntity).then(_ => setSaving(false));
+
+                fetchEvents().then(eventData => {
+                    if (eventData && eventData.events) {
+                        setEvents(eventData.events.instances);
+                        setSelectedTraining(trackedEntity);
+                    }
+                });
+            }
+            show({msg: i18n.t('Event successfully updated'), type: 'success'});
+        }
+    }
+
+    const saveRelationships = (trackedEntity) => {
+        const relationships = participants.filter(p => {
+            return event.relationships.find(rel => rel.from.trackedEntity.trackedEntity !== p.trackedEntity)
+        }).map(p => {
+            return {
+                relationshipType: 'iBFMyo4S0Nn',
+                from: {
+                    trackedEntity: {
+                        trackedEntity: p.trackedEntity
+                    }
+                },
+                to: {
+                    trackedEntity: {
+                        trackedEntity: trackedEntity
+                    }
+                }
+            }
+        });
+        return trackerCreate(engine, {
+            relationships
+        });
+    }
+
+    const removeParticipant = async (entity) => {
+        setParticipants(participants.filter(p => p.trackedEntity !== entity.trackedEntity));
+        pageParticipants();
+
+        const training = events.find(evt => evt.trackedEntity === selectedTraining);
+        if (training) {
+            const relationship = training.relationships.find(rel => rel?.from?.trackedEntity?.trackedEntity === entity.trackedEntity)?.relationship;
+            if (relationship) {
+                const response = await trackerDelete(engine, {
+                    relationships: [{
+                        relationship
+                    }]
+                });
+                if (response) {
+                    show({msg: i18n.t('Attendee successfully removed'), type: 'success'});
+                } else {
+                    show({msg: i18n.t('There was an error removing attendee'), type: 'error'});
+                }
+                /*engine.mutate({
+                    resource: 'tracker',
+                    type: 'create',
+                    params: {
+                        async: false,
+                        importStrategy: 'delete'
+                    },
+                    data: {
+                        relationships: [{
+                            relationship
+                        }]
+                    }
+                });*/
+            }
+        }
+    }
+
+    const fetchEvents = () => {
+        return engine.query({
+            events: {
+                resource: `tracker/trackedEntities`,
+                params: ({orgUnit}) => ({
+                    program: trainingProgram,
+                    fields: 'trackedEntity,attributes,relationships(relationship,from(trackedEntity(trackedEntity)))',
+                    orgUnit,
+                    paging: false
+                })
+            }
+        }, {
+            variables: {
+                orgUnit: selectedVenue
             }
         });
     }
@@ -399,7 +542,7 @@ export const EventsComponent = () => {
                         <div className="mx-auto w-full">
                             <div className="w-full">
                                 <div className="flex flex-col">
-                                    <div className="flex flex-col gap-1 mb-2">
+                                    {/*<div className="flex flex-col gap-1 mb-2">
                                         <div className="flex flex-row w-full rounded-md bg-white p-3 gap-x-1">
                                             <div className="w-3/12">
                                                 <ProgramStageComponent
@@ -414,51 +557,88 @@ export const EventsComponent = () => {
                                                 />
                                             </div>
                                         </div>
+                                    </div>*/}
+                                    <div className="flex flex-row card gap-x-1">
+                                        <div className="w-3/12 p-3">
+                                            <label htmlFor="stage"
+                                                   className="label">
+                                                {i18n.t('Venue')}
+                                            </label>
+                                            <OrganisationUnitComponent
+                                                handleOUChange={handleVenueChange}
+                                                selectedOU={venue}
+                                            />
+                                        </div>
+                                        {selectedVenue &&
+                                            <div className="w-3/12">
+                                                <label htmlFor="program"
+                                                       className="label">
+                                                    Events
+                                                </label>
+                                                <select
+                                                    className="select"
+                                                    value={selectedTraining}
+                                                    onChange={(event) => {
+                                                        setSelectedTraining(event.target.value);
+                                                    }}>
+                                                    <option
+                                                        selected>Select event
+                                                    </option>
+                                                    {trainings.map(option => {
+                                                            return <>
+                                                                <option
+                                                                    value={option.id}>{option.label}</option>
+                                                            </>
+                                                        }
+                                                    )}
+                                                </select>
+                                            </div>
+                                        }
                                     </div>
                                     {selectedStage &&
                                         <div className="flex flex-col w-full mb-2">
-                                            {configuredStages[selectedStage] && (configuredStages[selectedStage]['groupDataElements'] || []).length > 0 &&
+                                            {(trainingAttributes || []).length > 0 &&
                                                 <div className="w-full flex flex-col pt-2">
                                                     <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
-                                                        {/*{configuredStages[selectedStage] && Object.keys(configuredStages[selectedStage]['templates'] || {}).length > 0 &&
-                                                            <div className="w-3/12">
-                                                                <label htmlFor="stage"
-                                                                       className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                                                    {i18n.t('Select Saved Event')}
-                                                                </label>
-                                                                <select id="stage"
-                                                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                                                        value={selectedTemplate}
-                                                                        onChange={(event) => handleTemplateChange(event.target.value)}>
-                                                                    <option selected>Choose event</option>
-                                                                    {Object.keys(configuredStages[selectedStage]['templates'] || {}).map((name) => (
-                                                                            <option label={name} value={name} key={name}/>
-                                                                        )
-                                                                    )}
-                                                                </select>
-                                                            </div>
-                                                        }*/}
                                                         <div
                                                             className="relative overflow-x-auto shadow-md sm:rounded-lg">
-                                                            <div className="flex flex-row justify-end">
-                                                                <button type="button"
-                                                                        onClick={saveTraining}
-                                                                        className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-                                                                >Save /Update Event
-                                                                </button>
-                                                            </div>
-                                                            <div className="w-3/12 p-2">
-                                                                {dataElements.length > 0 && (configuredStages[selectedStage]['groupDataElements'] || []).map((cde, idx) => {
-                                                                    const de = dataElements.find(de => de.id === cde);
+                                                            {selectedVenue &&
+                                                                <div className="flex flex-row justify-end">
+                                                                    {selectedTraining &&
+                                                                        <button type="button"
+                                                                                onClick={() => {
+                                                                                    setParticipants([]);
+                                                                                    setPagedParticipants([]);
+                                                                                    setEvent({})
+                                                                                    setSelectedTraining('');
+                                                                                    setGroupValues({});
+                                                                                }}
+                                                                                disabled={saving === true}
+                                                                                className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                        >New Event
+                                                                        </button>
+                                                                    }
+                                                                    <button type="button"
+                                                                            onClick={saveTraining}
+                                                                            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                    >Save /Update Event
+                                                                    </button>
+                                                                </div>
+                                                            }
+                                                            {(trainingAttributes || []).map((cde, idx) => {
+                                                                const de = trainingAttributesData.find(ta => ta.id === cde);
+                                                                if (de && cde !== eventNameAttribute) {
                                                                     return <>
-                                                                        <DataElementComponent key={idx}
-                                                                                              value={groupDataElementValue(cde)}
-                                                                                              dataElement={de}
-                                                                                              labelVisible={true}
-                                                                                              valueChanged={createOrUpdateGroupEvent}/>
+                                                                        <div className="w-3/12 p-2">
+                                                                            <DataElementComponent key={idx}
+                                                                                                  value={groupDataElementValue(cde)}
+                                                                                                  dataElement={de}
+                                                                                                  labelVisible={true}
+                                                                                                  valueChanged={createOrUpdateGroupEvent}/>
+                                                                        </div>
                                                                     </>
-                                                                })}
-                                                            </div>
+                                                                }
+                                                            })}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -480,7 +660,8 @@ export const EventsComponent = () => {
                                                                 <thead
                                                                     className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                                                 <tr>
-                                                                    <th data-priority="1" className="px-6 py-3 w-1/12">#
+                                                                    <th data-priority="1"
+                                                                        className="px-6 py-3 w-1/12">#
                                                                     </th>
                                                                     <th data-priority="2"
                                                                         className="px-6 py-3 w-6/12">Profile
@@ -500,10 +681,9 @@ export const EventsComponent = () => {
                                                                             <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
                                                                             <td>
                                                                                 <button type="button"
-                                                                                        className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                                                                                        className="text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 focus:outline-none dark:focus:ring-red-800"
                                                                                         onClick={() => {
-                                                                                            setParticipants(participants.filter(p => p.trackedEntity !== entity.trackedEntity));
-                                                                                            pageParticipants();
+                                                                                            removeParticipant(entity)
                                                                                         }}>Remove
                                                                                 </button>
                                                                             </td>
@@ -519,6 +699,7 @@ export const EventsComponent = () => {
                                                                             <Pagination
                                                                                 page={participantsPage}
                                                                                 pageSize={participantPageSize}
+                                                                                pageCount={Math.ceil(participants.length / participantPageSize)}
                                                                                 total={participants.length}
                                                                                 onPageChange={(page) => pageParticipants(page)}
                                                                                 onPageSizeChange={(size) => {
@@ -539,7 +720,7 @@ export const EventsComponent = () => {
                                             <div className="w-full flex flex-row pt-2">
                                                 <div className="w-3/12 p-2 bg-white">
                                                     <OrganisationUnitComponent
-                                                        handleOUChange={handleEntityOUChange}
+                                                        handleOUChange={orgUnitChanged}
                                                         selectedOU={selectedOu}
                                                     />
                                                 </div>
@@ -560,7 +741,7 @@ export const EventsComponent = () => {
                                                                             <button type="button"
                                                                                     className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
                                                                                     onClick={addSelection}>Add
-                                                                                Participant(s)
+                                                                                Attendee(s)
                                                                             </button>
                                                                         }
                                                                     </caption>
@@ -629,6 +810,7 @@ export const EventsComponent = () => {
                                                                                 <Pagination
                                                                                     page={page}
                                                                                     pageSize={pageSize}
+                                                                                    pageCount={Math.ceil(totalEntities / pageSize)}
                                                                                     total={totalEntities}
                                                                                     onPageChange={(page) => setPage(page)}
                                                                                     onPageSizeChange={(size) => setPageSize(size)}

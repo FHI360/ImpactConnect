@@ -1,11 +1,10 @@
-import React, { createContext, useState, useCallback } from 'react';
+import React, { createContext, useCallback, useState } from 'react';
 import classes from './App.module.css'
+import { config } from './consts.js';
 import refresh from './icons/refresh.png'
 import search from './icons/search.png'
-import { config } from './consts';
 
 export const customImage = (source, size = 'small') => {
-
     // Check the source and set iconClass accordingly
     let iconClass = '';
     iconClass = size === 'small' ? classes.smallIcon : size === 'large' ? classes.largeIcon : classes.smallIcon;
@@ -15,11 +14,9 @@ export const customImage = (source, size = 'small') => {
     if (source.toLowerCase() === 'refresh') {
         return <img src={refresh} className={iconClass}/>
     }
-
 }
 
 export const createOrUpdateDataStore = async (engine, postObject, store, key, mode = '') => {
-
     if (!postObject.hasOwnProperty('modifiedDate')) {
         // If it doesn't exist, add it to the object
         postObject.modifiedDate = modifiedDate();
@@ -43,7 +40,6 @@ export const createOrUpdateDataStore = async (engine, postObject, store, key, mo
     }
 
     try {
-
         const result = await engine.mutate({
             resource: `dataStore/${store}/${key}`,
             type: modeType ? 'create' : 'update',
@@ -53,7 +49,6 @@ export const createOrUpdateDataStore = async (engine, postObject, store, key, mo
     } catch (error) {
         console.error('Error creating or updating object:', error);
         // throw error;
-
     }
 }
 
@@ -258,20 +253,44 @@ export const removeDuplicates = (inputString) => {
     return uniqueArray.join(';');
 };
 
-
-export const delete_tei = async (engine, tei) => {
-
+export const trackerDelete = async (engine, data) => {
     try {
-        const response = await engine.mutate({
-            resource: `trackedEntityInstances/${tei}`,
-            type: 'delete',
+        await engine.mutate({
+            resource: `tracker`,
+            type: 'create',
+            params: {
+                async: false,
+                importStrategy: 'delete'
+            },
+            data
         });
         return true
     } catch (error) {
         return false
     }
+}
+
+export const trackerCreate = async (engine, data) => {
+    try {
+        const response = await engine.mutate({
+            resource: 'tracker',
+            type: 'create',
+            params: {
+                async: false
+            },
+            data
+        });
+        if (response.status === 'OK') {
+            return response.bundleReport.typeReportMap;
+        } else {
+            return false;
+        }
+    } catch (e) {
+        return false;
+    }
 
 }
+
 export const generateRandomId = () => {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const idLength = 11;
@@ -390,7 +409,8 @@ export const dataStoreQuery = {
 
 export const getParticipant = (entity, nameAttributes) => {
     return nameAttributes.map(attr => {
-        return entity.enrollments[0].attributes?.find(attribute => attribute.attribute === attr)?.value
+        const attributes = entity.enrollments && entity.enrollments.length > 0 && entity.enrollments[0].attributes || entity.attributes;
+        return attributes?.find(attribute => attribute.attribute === attr)?.value
     }).join(' ')
 }
 
@@ -401,4 +421,24 @@ export const formatDate = (date) => {
     return new Intl.DateTimeFormat('en-GB', {
         dateStyle: 'medium',
     }).format(new Date(date));
+}
+
+export const fetchEntities = (engine, ids, fields) => {
+    const fetchEntity = (id) => {
+        return engine.query({
+            entity: {
+                resource: 'tracker/trackedEntities',
+                id,
+                params: {
+                    fields,
+                }
+            }
+        })
+    }
+    const requests = ids.map(id => fetchEntity(id));
+    return Promise.all(requests);
+}
+
+export const isObjectEmpty = (objectName) => {
+    return Object.keys(objectName).length === 0
 }

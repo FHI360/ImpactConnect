@@ -1,12 +1,21 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
-import { Modal, ModalActions, ModalContent, ModalTitle } from '@dhis2/ui';
-import classnames from 'classnames';
+import { Pagination } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
 import { config } from '../../consts.js';
-import { formatDate, getParticipant, provisionOUs, SharedStateContext } from '../../utils.js';
+import {
+    fetchEntities,
+    formatDate,
+    getParticipant,
+    isObjectEmpty,
+    paginate,
+    provisionOUs,
+    SharedStateContext,
+    trackerCreate
+} from '../../utils.js';
 import { DataElementComponent } from '../DataElement.js';
 import { Navigation } from '../Navigation.js';
+import OrganisationUnitComponent from '../OrganisationUnitComponent.js';
 import { TrainingsComponent } from '../TrainingsComponent.js';
 
 export const Main = () => {
@@ -28,33 +37,28 @@ export const Main = () => {
     const [trainingProgram, setTrainingProgram] = useState('');
     const [eventNameAttribute, setEventNameAttribute] = useState('');
     const [selectedTraining, setSelectedTraining] = useState('');
-    const [orgUnit, setOrgUnit] = useState(selectedSharedOrgUnit);
+    const [venue, setVenue] = useState();
+    const [selectedVenue, setSelectedVenue] = useState('');
+    const [orgUnits, setOrgUnits] = useState([]);
     const [events, setEvents] = useState([]);
     const [dates, setDates] = useState([new Date()]);
     const [startDate, setStateDate] = useState(new Date());
     const [endDate, setEndDate] = useState(null);
-    const [dateEntities, setDateEntities] = useState({});
     const [trainings, setTrainings] = useState([]);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
     const [entities, setEntities] = useState([]);
-    const [allEntities, setAllEntities] = useState([]);
     const [selectedOU, setSelectedOU] = useState(selectedSharedOU);
     const [nameAttributes, setNameAttributes] = useState([]);
     const [filterAttributes, setFilterAttributes] = useState([]);
     const [configuredStages, setConfiguredStages] = useState({});
     const [entityAttributes, setEntityAttributes] = useState([]);
-    const [endDateVisible, setEndDateVisible] = useState(false);
     const [groupEdit, setGroupEdit] = useState(false);
     const [edits, setEdits] = useState([]);
     const [originalEdits, setOriginalEdits] = useState([]);
     const [selectedEntities, setSelectedEntities] = useState([]);
     const [repeatable, setRepeatable] = useState(false);
-    const [columnDisplay, setColumnDisplay] = useState(false);
     const [groupValues, setGroupValues] = useState({});
-    const [modalShow, setModalShow] = useState(false);
-    const [confirmShow, setConfirmShow] = useState(false);
-    const [templateName, setTemplateName] = useState('');
     const [pagedParticipants, setPagedParticipants] = useState([]);
 
     const {show} = useAlert(
@@ -99,25 +103,18 @@ export const Main = () => {
     const dataElementsQuery = {
         programStage: {
             resource: `programStages`,
-            id: ({id}) => id,
             params: ({
                 fields: 'repeatable, programStageDataElements(dataElement(id, name, valueType, optionSet(id))'
             })
         }
     }
 
-    const entitiesQuery = {
-        entities: {
-            resource: 'tracker/trackedEntities',
-            params: ({orgUnit, program, page, pageSize}) => {
-                return ({
-                    program: program,
-                    orgUnit: orgUnit,
-                    pageSize: pageSize,
-                    page: page,
-                    paging: true,
-                    fields: ['*'],
-                })
+    const organisationsQuery = {
+        orgUnits: {
+            resource: `organisationUnits`,
+            params: {
+                fields: ['id', 'displayName'],
+                paging: 'false',
             }
         }
     }
@@ -131,32 +128,13 @@ export const Main = () => {
         }
     });
 
-    const {data: entityData, refetch} = useDataQuery(entitiesQuery, {
-        variables: {
-            program: selectedProgram,
-            orgUnit: orgUnit,
-            page,
-            pageSize
-        }
-    });
-
     const {
-        data: elementsData,
-        refetch: refetchDataElements
-    } = useDataQuery(dataElementsQuery, {variables: {id: selectedStage}});
+        data: elementsData
+    } = useDataQuery(dataElementsQuery );
 
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
-    const {data: trainingData} = useDataQuery({
-        entities: {
-            resource: 'tracker/trackedEntities',
-            params: {
-                program: trainingProgram,
-                paging: false,
-                fields: ['*'],
-            }
-        }
-    })
+    const {data: orgUnitsData} = useDataQuery(organisationsQuery);
 
     const {
         data: attributesData,
@@ -170,8 +148,6 @@ export const Main = () => {
                 setNameAttributes(entry.value.nameAttributes || []);
                 setFilterAttributes(entry.value.filterAttributes || []);
                 setConfiguredStages(entry.value.configuredStages || {});
-                setEndDateVisible(entry.value.endDateVisible);
-                setColumnDisplay(entry.value.columnDisplay);
                 setParticipantsProgram(entry.value.participantsProgram);
                 setTrainingProgram(entry.value.trainingProgram);
                 setGroupEdit(entry.value.groupEdit);
@@ -200,29 +176,14 @@ export const Main = () => {
     }, [dataEvent, startDate, endDate, selectedStage, selectedProgram]);
 
     useEffect(() => {
-        refetchDataElements({id: selectedStage});
-        if (elementsData && elementsData.programStage && elementsData.programStage.programStageDataElements) {
-            const dataElements = elementsData.programStage.programStageDataElements.map(data => data.dataElement);
+        if (elementsData && elementsData.programStage && elementsData.programStage.programStages) {
+            const dataElements = elementsData.programStage.programStages.flatMap(ps => ps.programStageDataElements.map(data => data.dataElement));
             setDataElements(dataElements);
-            setRepeatable(elementsData.programStage.repeatable);
+            //setRepeatable(elementsData.programStage.repeatable);
         }
         setOriginalEdits([]);
         setEdits([]);
-    }, [elementsData, selectedStage]);
-
-    useEffect(() => {
-        if (entityData && entityData.entities) {
-            setAllEntities(entityData.entities.instances);
-            setEntities(entityData.entities.instances);
-        } else {
-            setEntities([])
-        }
-    }, [orgUnit, selectedProgram, entityData, page, pageSize]);
-
-    useEffect(() => {
-        setPage(1);
-        refetch({page: 1, pageSize: pageSize, program: selectedProgram, orgUnit: orgUnit});
-    }, [orgUnit, selectedProgram, pageSize, page]);
+    }, [elementsData]);
 
     useEffect(() => {
         attributesRefetch({program: selectedProgram})
@@ -232,7 +193,7 @@ export const Main = () => {
     }, [attributesData, selectedProgram])
 
     useEffect(() => {
-        if (trainingProgram) {
+        if (trainingProgram && selectedVenue) {
             engine.query({
                 trainings: {
                     resource: 'tracker/trackedEntities',
@@ -240,7 +201,7 @@ export const Main = () => {
                         program: trainingProgram,
                         paging: false,
                         fields: 'attributes,trackedEntity',
-                        orgUnit: 'hc4courIKRA'
+                        orgUnit: selectedVenue
                     }
                 }
             }).then(res => {
@@ -261,91 +222,51 @@ export const Main = () => {
             })
         }
 
-    }, [trainingProgram])
+    }, [trainingProgram, selectedVenue])
 
     useEffect(() => {
         if (selectedTraining) {
             engine.query({
-                trainings: {
+                training: {
                     resource: `tracker/trackedEntities/${selectedTraining}`,
                     params: {
-                        fields: 'relationships(from(trackedEntity(trackedEntity)))',
+                        fields: 'attributes,relationships(from(trackedEntity(trackedEntity)))',
                     }
                 }
             }).then(res => {
-                if (res && res.trainings) {
-                    const ids = res.trainings.relationships.map(rel => rel.from.trackedEntity.trackedEntity).join(',');
-                    if (ids) {
-                        ids.split(',').forEach(id => {
-                            engine.query({
-                                attendee: {
-                                    resource: 'tracker/trackedEntities',
-                                    id,
-                                    params: {
-                                        fields: '*',
-                                    }
-                                }
-                            }).then(attendee => {
-                                setEntities([...entities, attendee.attendee]);
-                                setPagedParticipants([...entities, attendee.attendee]);
+                if (res && res.training) {
+                    const ids = res.training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
+                    if (ids.length > 0) {
+                        fetchEntities(engine, ids, '*').then(value => {
+                            const attendees = value.map(v => v.entity);
+                            setEntities(attendees);
 
-                                console.log('[...entities, attendee.attendee]', [...entities, attendee.attendee])
-                            });
-                        })
-
-                        console.log('Finished')
+                            const currentPage = paginate(attendees, page, pageSize);
+                            setPagedParticipants(currentPage);
+                        });
                     }
+                    res.training.attributes.forEach(attr => {
+                        if (attr.attribute === 'CUW9TfQpAu6') {
+                            setStateDate(new Date(attr.value))
+                        } else if (attr.attribute === 'KPwanQQE4FU') {
+                            setEndDate(new Date(attr.value))
+                        }
+                    })
                 }
             })
         }
     }, [selectedTraining])
 
-
-    const dataStoreOperation = (type, data) => {
-        const value = {
-            nameAttributes,
-            filterAttributes,
-            configuredStages,
-            endDateVisible,
-            groupEdit,
-            columnDisplay
+    useEffect(() => {
+        if (orgUnitsData && orgUnitsData.orgUnits) {
+            setOrgUnits(orgUnitsData.orgUnits.organisationUnits);
         }
-        value[type] = data;
-        const mutation = {
-            resource: `dataStore/${config.dataStoreName}/${config.dataStoreKey}`,
-            type: 'update',
-            data: value
-        }
-        engine.mutate(mutation).then(_ => {
-            show({msg: i18n.t('Event successfully saved'), type: 'success'});
-        });
-    }
+    }, [orgUnitsData]);
 
-    const stateDateChanged = event => {
-        const startDate = new Date(event.calendarDateString)
-        setStateDate(startDate);
-        calculateDatesBetween(startDate, endDate);
-    }
-
-    const endDateChanged = event => {
-        const endDate = new Date(event.calendarDateString);
-        setEndDate(endDate)
-        calculateDatesBetween(startDate, endDate);
-    }
-
-    const calculateDatesBetween = (startDate, endDate) => {
-        if (endDateVisible) {
-            const dates = [];
-            const currentDate = new Date(startDate);
-
-            while (currentDate <= endDate) {
-                dates.push(new Date(currentDate));
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-            setDates(dates);
-        } else {
-            setDates([startDate])
-        }
+    const pageParticipants = (page = 1, size = pageSize) => {
+        setPage(page);
+        const currentPage = paginate(entities, page, size);
+        setPagedParticipants(currentPage);
     }
 
     const datesBetween = (startDate, endDate) => {
@@ -389,33 +310,6 @@ export const Main = () => {
             return (editedEntity.values.find(value => value.dataElement.id === dataElement && formatDate(date) === formatDate(value.date))?.value ?? '') + '';
         }
         return null;
-    }
-
-    const selectDate = (date, checked) => {
-        const dates = dateEntities;
-        if (checked) {
-            dates[date] = entities.map(e => e.trackedEntity);
-        } else {
-            dates[date] = [];
-        }
-
-        setDateEntities(dates);
-    }
-
-    const dateChecked = (entity, date) => {
-        return dateEntities[date]?.includes(entity.trackedEntity)
-    }
-
-    const checkEntity = (entity, date, checked) => {
-        const dates = dateEntities;
-        let entities = dateEntities[date];
-        if (checked) {
-            entities.push(entity.trackedEntity);
-        } else {
-            entities = entities.filter(e => e.trackedEntity !== entity.trackedEntity);
-        }
-        dates[date] = entities;
-        setDateEntities(dates);
     }
 
     const saveEdits = () => {
@@ -508,27 +402,19 @@ export const Main = () => {
             });
         });
 
-        engine.mutate({
-            resource: 'tracker',
-            type: 'create',
-            params: {
-                async: false
-            },
-            data: {
-                events
-            }
-        }).then((response) => {
-            if (response.status === 'OK') {
+        trackerCreate(engine, {events}).then((response) => {
+            if (response) {
                 setEdits([]);
-                refetch({
-                    program: selectedProgram,
-                    orgUnit: orgUnit,
-                    page,
-                    pageSize
+                fetchEntities(engine, entities.map(e => e.trackedEntity), '*').then(value => {
+                    const attendees = value.map(v => v.entity);
+                    setEntities(attendees);
+
+                    const currentPage = paginate(attendees, page, pageSize);
+                    setPagedParticipants(currentPage);
                 });
-                show({msg: i18n.t('Data successfully updated'), type: 'success'});
+                show({msg: i18n.t('Attendance successfully updated'), type: 'success'});
             } else {
-                show({msg: i18n.t('There was an error updating records'), type: 'error'});
+                show({msg: i18n.t('There was an error updating attendance'), type: 'error'});
             }
         });
     }
@@ -607,6 +493,12 @@ export const Main = () => {
         createOrUpdateEvent(entity, startDate, dataElement, value);
     }
 
+    const createOrUpdateGroupEvent = (dataElement, value) => {
+        const values = groupValues;
+        values[dataElement.id] = value;
+        setGroupValues(Object.assign({}, values));
+    }
+
     const individualDataElementsForDates = () => {
         const configuredDataElements = [];
         switch (datesBetween(startDate, endDate)) {
@@ -645,24 +537,18 @@ export const Main = () => {
         return configuredDataElements;
     }
 
-    const saveGroupTemplate = () => {
-        const template = {
-            startDate,
-            endDate,
-            dataElements: (configuredStages[selectedStage]['dataElements'] || []).map(de => {
-                return {
-                    dataElement: de,
-                    value: groupDataElementValue(de)
-                }
-            })
+    const handleVenueChange = event => {
+        setSelectedVenue(event.id);
+        setVenue(event.selected)
+    }
+
+    const attributeMap = () => {
+        return {
+            CUW9TfQpAu6: 'uaQMciOOeWp',
+            KPwanQQE4FU: 'ydubZaoEeMy',
+            CJ7g6K9Ukvf: 'UfMZ6XN7PS7',
+            rlCta8FG2fz: 'e0RUQ4dgkgL'
         };
-
-        configuredStages[selectedStage]['templates'] = configuredStages[selectedStage]['templates'] || {};
-        configuredStages[selectedStage]['templates'][templateName] = template;
-        setConfiguredStages(configuredStages);
-        setTemplateName('');
-
-        dataStoreOperation('configuredStages', configuredStages);
     }
 
     return (
@@ -673,14 +559,71 @@ export const Main = () => {
                     <div className="p-6">
                         <div className="mx-auto w-full">
                             <div className="w-full">
-                                <div className="flex flex-col">
-                                    {trainings && trainings.length > 0 &&
+                                <div className="flex flex-row card gap-x-1">
+                                    <div className="w-3/12 p-3">
+                                        <label htmlFor="stage"
+                                               className="label">
+                                            {i18n.t('Venue')}
+                                        </label>
+                                        <OrganisationUnitComponent
+                                            handleOUChange={handleVenueChange}
+                                            selectedOU={venue}
+                                        />
+                                    </div>
+                                    {selectedVenue && trainings && trainings.length > 0 &&
                                         <div className="w-full">
                                             <TrainingsComponent trainings={trainings}
                                                                 trainingSelected={(training) => setSelectedTraining(training)}/>
                                         </div>
                                     }
+                                </div>
+                                <div className="flex flex-col">
+                                    {entities.length > 0 &&
+                                        <div className="card">
+                                            <div
+                                                className="flex items-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={groupEdit === true}
+                                                    onChange={(payload) => {
+                                                        setGroupEdit(payload.target.checked);
+                                                    }}
+                                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"/>
+                                                <label
+                                                    className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+                                                    {i18n.t('Group Action?')}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    }
                                     <div className="flex flex-col w-full mb-2">
+                                        {groupEdit && entities.length > 0 &&
+                                            <div className="card">
+                                                <div className="flex flex-col w-3/12 p-6">
+                                                    <label htmlFor="program"
+                                                           className="label pb-2">
+                                                        Attendance
+                                                    </label>
+                                                    {individualDataElementsForDates().map((id) => {
+                                                        const de = dataElements.find(e => e.id === id)
+                                                        return <>
+                                                            <div
+                                                                className="flex flex-col my-auto pl-4">
+                                                                <DataElementComponent
+                                                                    value={groupDataElementValue(de.id)}
+                                                                    dataElement={de}
+                                                                    readonly={selectedEntities.length === 0}
+                                                                    valueChanged={(d, v) => {
+                                                                        createOrUpdateGroupEvent(de, v)
+                                                                    }
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    })}
+                                                </div>
+                                            </div>
+                                        }
                                         {entities.length > 0 &&
                                             <div className="w-full flex flex-col pt-2">
                                                 <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
@@ -695,21 +638,32 @@ export const Main = () => {
 
                                                                 </p>
                                                                 <div className="flex flex-row justify-end">
-                                                                    {/*<button type="button"
-                                                                            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-                                                                            onClick={() => setConfirmShow(true)}>Reload
-                                                                        records
-                                                                    </button>*/}
-                                                                    {edits.length !== 0 && selectedEntities.length > 0 &&
+                                                                    {((groupEdit && !isObjectEmpty(groupValues) && selectedEntities.length > 0) || (!groupEdit && edits.length > 0)) &&
                                                                         <button type="button"
                                                                                 className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-                                                                                onClick={saveEdits}>Save Records
+                                                                                onClick={saveEdits}>Save Attendance
                                                                         </button>
                                                                     }
                                                                 </div>
                                                             </caption>
                                                             <thead
                                                                 className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                            {!groupEdit &&
+                                                                <tr>
+                                                                    <td colSpan={4}
+                                                                        rowSpan={1}></td>
+                                                                    {individualDataElementsForDates().map((id, idx) => {
+                                                                        const de = dataElements.find(e => e.id === id)
+                                                                        return <th key={idx}
+                                                                                   rowSpan={5}
+                                                                                   style={{width: `${41.66 / datesBetween(startDate, endDate)}%`}}
+                                                                                   className="py-3 h-48">
+                                                                        <span
+                                                                            className="whitespace-nowrap block text-left -rotate-90 w-16 pb-4">{de?.name}</span>
+                                                                        </th>
+                                                                    })}
+                                                                </tr>
+                                                            }
                                                             <tr>
                                                                 <th className="px-6 py-6 w-1/12">
                                                                     <div
@@ -718,7 +672,7 @@ export const Main = () => {
                                                                             type="checkbox"
                                                                             onChange={(event) => {
                                                                                 if (event.target.checked) {
-                                                                                    setSelectedEntities(allEntities)
+                                                                                    setSelectedEntities(entities)
                                                                                 } else {
                                                                                     setSelectedEntities([])
                                                                                     setEdits([])
@@ -730,22 +684,12 @@ export const Main = () => {
                                                                 </th>
                                                                 <th data-priority="1" className="px-6 py-3 w-1/12">#
                                                                 </th>
-                                                                <th data-priority="2" className="px-6 py-3 w-3/12">Profile
+                                                                <th data-priority="2"
+                                                                    className="px-6 py-3 w-3/12">Profile
                                                                 </th>
-                                                                <th data-priority="3"
-                                                                    className="px-6 py-3 mx-auto text-center"
-                                                                    colSpan={datesBetween(startDate, endDate)}>
+                                                                <th data-priority="2"
+                                                                    className="px-6 py-3 w-2/12">Org Unit
                                                                 </th>
-                                                            </tr>
-                                                            <tr>
-                                                                {individualDataElementsForDates().map((id, idx) => {
-                                                                    const de = dataElements.find(e => e.id === id)
-                                                                    return <th key={idx}
-                                                                               className="px-6 py-3">
-                                                                        <div
-                                                                            className="text-left -rotate-90 w-16 pb-4">{de?.name}</div>
-                                                                    </th>
-                                                                })}
                                                             </tr>
                                                             </thead>
                                                             <tbody>
@@ -784,12 +728,13 @@ export const Main = () => {
                                                                         </td>
                                                                         <td>{index + 1}</td>
                                                                         <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
-                                                                        {dataElements.length > 0 && individualDataElementsForDates().map((cde, idx2) => {
+                                                                        <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
+                                                                        {!groupEdit && dataElements.length > 0 && individualDataElementsForDates().map((cde, idx2) => {
                                                                             const de = dataElements.find(de => de.id === cde);
                                                                             return <>
                                                                                 <td>
                                                                                     <div
-                                                                                        className="flex flex-col my-auto">
+                                                                                        className="flex flex-col my-auto pl-4">
                                                                                         <DataElementComponent
                                                                                             key={idx2}
                                                                                             value={dataElementValue(startDate, de.id, entity)}
@@ -806,6 +751,28 @@ export const Main = () => {
                                                                 </>
                                                             })}
                                                             </tbody>
+                                                            <tfoot>
+                                                            <tr>
+                                                                <th className="w-full p-2"
+                                                                    colSpan={!groupEdit ? datesBetween(startDate, endDate) + 4: 4}>
+                                                                    <div
+                                                                        className="flex flex-row w-full justify-end">
+                                                                        <Pagination
+                                                                            page={page}
+                                                                            pageCount={Math.ceil(entities.length / pageSize)}
+                                                                            pageSize={pageSize}
+                                                                            total={entities.length}
+                                                                            onPageChange={(page) => pageParticipants(page)}
+                                                                            onPageSizeChange={(size) => {
+                                                                                setPage(1);
+                                                                                setPageSize(size);
+                                                                                pageParticipants(1, size);
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </th>
+                                                            </tr>
+                                                            </tfoot>
                                                         </table>
                                                     </div>
                                                 </div>
@@ -818,78 +785,6 @@ export const Main = () => {
                     </div>
                 </div>
             </div>
-            <Modal hide={!modalShow}>
-                <ModalTitle>Event</ModalTitle>
-
-                <ModalContent>
-                    <div
-                        className="w-full mb-2">
-                        <label
-                            className="text-left block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                            Event Name
-                        </label>
-                        <input
-                            type="text"
-                            value={templateName}
-                            onChange={(event) => setTemplateName(event.target.value)}
-                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"/>
-                    </div>
-                </ModalContent>
-
-                <ModalActions>
-                    <button type="button"
-                            className="py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
-                            onClick={() => {
-                                setModalShow(false);
-                            }}>
-                        Cancel
-                    </button>
-
-                    <button type="button"
-                            className={classnames(
-                                {'text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800': !!templateName},
-                                {'text-white bg-blue-400 dark:bg-blue-500 cursor-not-allowed font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 text-center': !templateName}
-                            )}
-                            disabled={!templateName}
-                            onClick={() => {
-                                setModalShow(false);
-                                saveGroupTemplate();
-                            }}>
-                        Save
-                    </button>
-                </ModalActions>
-            </Modal>
-            <Modal hide={!confirmShow}>
-                <ModalTitle>Reload profiles</ModalTitle>
-
-                <ModalContent>
-                    Click ok to reload data. Any unsaved data will be lost
-                </ModalContent>
-
-                <ModalActions>
-                    <button type="button"
-                            className="py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
-                            onClick={() => {
-                                setConfirmShow(false);
-                            }}>
-                        Cancel
-                    </button>
-
-                    <button type="button"
-                            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-                            onClick={() => {
-                                refetch({
-                                    program: selectedProgram,
-                                    orgUnit: orgUnit,
-                                    page: 1,
-                                    pageSize
-                                });
-                                setConfirmShow(false);
-                            }}>
-                        Reload
-                    </button>
-                </ModalActions>
-            </Modal>
         </>
     )
 }
