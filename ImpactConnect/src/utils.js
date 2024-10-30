@@ -442,3 +442,48 @@ export const fetchEntities = (engine, ids, fields) => {
 export const isObjectEmpty = (objectName) => {
     return Object.keys(objectName).length === 0
 }
+
+export const sortEntities = (entities, nameAttributes = []) => {
+    return entities.sort((e1, e2) => {
+        const attributes1 = e1.enrollments && e1.enrollments.length > 0 && e1.enrollments[0].attributes || e1.attributes;
+        const attributes2 = e2.enrollments && e2.enrollments.length > 0 && e2.enrollments[0].attributes || e2.attributes;
+
+        for (let i = 0; i < nameAttributes.length; i++) {
+            const attribute = nameAttributes[i];
+            const attribute1 = attributes1.find(attr => attr.attribute === attribute)?.value ?? '';
+            const attribute2 = attributes2.find(attr => attr.attribute === attribute)?.value ?? '';
+
+            const compare = attribute1.localeCompare(attribute2);
+            if (compare !== 0) {
+                return compare;
+            }
+        }
+
+        return 0;
+    })
+}
+
+export const searchEntities = (keyword = '', entities, nameAttributes = []) => {
+    return entities.filter(entity => {
+        const attributes = entity.enrollments && entity.enrollments.length > 0 && entity.enrollments[0].attributes || entity.attributes;
+        const names = attributes.filter(attr => nameAttributes.includes(attr.attribute))
+            .map(attr => attr.value);
+
+        return names.some(name => name.toLowerCase().includes((keyword ?? '').toLowerCase()))
+    })
+}
+
+export const daysBetween = (startDate, endDate) => {
+    if (endDate) {
+        const dates = [];
+        const currentDate = new Date(startDate);
+
+        while (currentDate <= endDate) {
+            dates.push(new Date(currentDate));
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        return dates.length;
+    } else {
+        return 1;
+    }
+}

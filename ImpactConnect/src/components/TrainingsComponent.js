@@ -3,11 +3,12 @@ import PropTypes from 'prop-types';
 import React, { useEffect, useState } from 'react';
 import { DataElementComponent } from './DataElement.js';
 
-export const TrainingsComponent = ({trainings, trainingSelected}) => {
+export const TrainingsComponent = ({program, trainings, trainingSelected}) => {
     const engine = useDataEngine();
     const [selectedTraining, setSelectedTraining] = useState('');
     const [collapsed, setCollapsed] = useState(false);
     const [attributes, setAttributes] = useState([]);
+    const [entityAttributes, setEntityAttributes] = useState([]);
 
     useEffect(() => {
         if (selectedTraining) {
@@ -16,10 +17,24 @@ export const TrainingsComponent = ({trainings, trainingSelected}) => {
                     resource: `tracker/trackedEntities/${selectedTraining}`,
                     params: {
                         fields: 'attributes',
+                        program
                     }
                 }
             }).then(res => {
                 setAttributes(res.trainings.attributes);
+            });
+
+            engine.query({
+                attributes: {
+                    resource: `trackedEntityAttributes`,
+                    params: ({program}) => ({
+                        fields: ['id', 'displayName', 'optionSet(id)', 'valueType'],
+                        paging: 'false',
+                        program: program
+                    }),
+                }
+            }).then(res => {
+                setEntityAttributes(res.attributes.trackedEntityAttributes);
             })
         }
     }, [selectedTraining]);
@@ -29,7 +44,7 @@ export const TrainingsComponent = ({trainings, trainingSelected}) => {
             <div className="pb-2 w-3/12">
                 <label htmlFor="program"
                        className="label">
-                    Training
+                    Available Events
                 </label>
                 <select
                     className="select"
@@ -86,11 +101,12 @@ export const TrainingsComponent = ({trainings, trainingSelected}) => {
                                             className="relative overflow-x-auto shadow-md sm:rounded-lg">
                                             <div className="w-3/12 p-2">
                                                 {attributes.map((attr, idx) => {
+                                                    const de = entityAttributes.find(ea => ea.id === attr.attribute);
                                                     return <>
                                                         <DataElementComponent key={idx}
                                                                               value={attr.value}
                                                                               label={attr.displayName}
-                                                                              dataElement={attr}
+                                                                              dataElement={de}
                                                                               labelVisible={true}
                                                                               readonly={true}/>
                                                     </>
@@ -109,6 +125,7 @@ export const TrainingsComponent = ({trainings, trainingSelected}) => {
 }
 
 TrainingsComponent.propTypes = {
+    program: PropTypes.string,
     trainingSelected: PropTypes.func,
     trainings: PropTypes.array
 };
