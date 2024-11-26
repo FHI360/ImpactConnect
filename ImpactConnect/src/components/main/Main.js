@@ -11,15 +11,14 @@ import {
     isObjectEmpty,
     paginate,
     searchEntities,
-    sortEntities,
-    trackerCreate
+    sortEntities, trackerCreate
 } from '../../utils.js';
 import { DataElementComponent } from '../DataElement.js';
 import { Navigation } from '../Navigation.js';
-import OrganisationUnitComponent from '../OrganisationUnitComponent.js';
 import { SearchComponent } from '../SearchComponent.js';
 import { SpinnerComponent } from '../SpinnerComponent.js';
 import { TrainingsComponent } from '../TrainingsComponent.js';
+import { VenueComponent } from '../VenueComponent.js';
 
 export const Main = () => {
     const engine = useDataEngine();
@@ -30,7 +29,6 @@ export const Main = () => {
     const [selectedTraining, setSelectedTraining] = useState('');
     const [stages, setStages] = useState([]);
     const [selectedStage, setSelectedStage] = useState('');
-    const [venue, setVenue] = useState();
     const [selectedVenue, setSelectedVenue] = useState('');
     const [orgUnits, setOrgUnits] = useState([]);
     const [startDate, setStateDate] = useState(new Date());
@@ -49,6 +47,8 @@ export const Main = () => {
     const [pagedParticipants, setPagedParticipants] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [eventAttributes, setEventAttributes] = useState([]);
+    const [scrollHeight, setScrollHeight] = useState('350px');
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -169,6 +169,7 @@ export const Main = () => {
                 }
             }).then(res => {
                 if (res && res.training) {
+                    setEventAttributes(res.training.attributes);
                     const ids = res.training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
                     if (ids.length > 0) {
                         fetchEntities(engine, ids, '*').then(value => {
@@ -181,6 +182,7 @@ export const Main = () => {
                     } else {
                         setLoading(false);
                     }
+
                     res.training.attributes.forEach(attr => {
                         if (attr.attribute === EVENT_OPTIONS.attributes.startDate) {
                             setStateDate(new Date(attr.value))
@@ -198,7 +200,7 @@ export const Main = () => {
                                     selectedStage = ACTIVITY_STAGE_MAPPING[2];
                                     break;
                                 case 3:
-                                    selectedStage =ACTIVITY_STAGE_MAPPING[3];
+                                    selectedStage = ACTIVITY_STAGE_MAPPING[3];
                                     break;
                                 default:
                                     selectedStage = ACTIVITY_STAGE_MAPPING[1];
@@ -221,6 +223,28 @@ export const Main = () => {
     useEffect(() => {
         setGroupValues({});
     }, [groupEdit]);
+
+    useEffect(() => {
+        const adjustScrollHeight = () => {
+            const height = window.innerHeight;
+            if (height < 800) {
+                setScrollHeight('350px');
+            } else {
+                setScrollHeight('700px');
+            }
+        };
+
+        // Adjust scrollHeight initially
+        adjustScrollHeight();
+
+        // Add event listener to adjust on resize
+        window.addEventListener('resize', adjustScrollHeight);
+
+        // Clean up event listener on component unmount
+        return () => {
+            window.removeEventListener('resize', adjustScrollHeight);
+        };
+    }, []);
 
     const pageParticipants = () => {
         const currentPage = paginate(entities, page, pageSize);
@@ -324,13 +348,22 @@ export const Main = () => {
                     }
                 });
 
-                Object.keys(groupValues).map(key => {
-                    const de = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+                const attributes = eventAttributes.map(attr => {
+                    const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
                     return {
-                        dataElement: de.mappings[key],
+                        dataElement: mapping.mappings[attr.attribute],
+                        value: attr.value
+                    }
+                }).filter(v => v.dataElement && v.dataElement.length > 0)
+
+                attributes.push(...Object.keys(groupValues).map(key => {
+                    return {
+                        dataElement: key,
                         value: groupValues[key]
                     }
-                }).forEach(de => {
+                }));
+
+                attributes.forEach(de => {
                     const dataValue = event.dataValues.find(dv => dv.dataElement === de.dataElement) || {};
                     dataValue.dataElement = de.dataElement;
                     dataValue.value = (de.value ?? '') + '';
@@ -355,7 +388,8 @@ export const Main = () => {
             if (response) {
                 setEdits([]);
                 fetchEntities(engine, entities.map(e => e.trackedEntity), '*').then(value => {
-                    const attendees = value.map(v => v.entity);
+                    const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
+                    setAllEntities(attendees);
                     setEntities(attendees);
                     setSaving(false);
                 });
@@ -450,7 +484,7 @@ export const Main = () => {
 
     const individualDataElementsForDates = () => {
         const configuredDataElements = [];
-        const days = EVENT_OPTIONS.stageMapping.find(s=> s.id === selectedStage)?.days;
+        const days = EVENT_OPTIONS.stageMapping.find(s => s.id === selectedStage)?.days;
         if (days) {
             for (let i = 1; i <= daysBetween(startDate, endDate); i++) {
                 configuredDataElements.push(days[i])
@@ -458,11 +492,6 @@ export const Main = () => {
         }
 
         return configuredDataElements;
-    }
-
-    const handleVenueChange = event => {
-        setSelectedVenue(event.id);
-        setVenue(event.selected)
     }
 
     const search = (keyword) => {
@@ -484,26 +513,20 @@ export const Main = () => {
                             <div className="w-full">
                                 <div className="w-full flex flex-row pt-2 gap-x-1">
                                     <div
-                                        className="w-3/12 flex flex-row card">
-                                        <div className="w-3/12 p-3">
+                                        className={selectedVenue ? 'w-3/12 flex flex-col card gap-x-1' : 'w-full flex flex-col card gap-x-1'}>
+                                        <div className={!selectedVenue ? 'w-3/12 p-3' : 'w-10/12 p-3'}>
                                             <label htmlFor="stage"
                                                    className="label">
                                                 {i18n.t('Event Venue')}
                                             </label>
-                                            <OrganisationUnitComponent
-                                                handleOUChange={handleVenueChange}
-                                                selectedOU={venue}
+                                            <VenueComponent
+                                                venueSelected={(venue) => setSelectedVenue(venue)}
                                             />
                                             {!selectedVenue &&
                                                 <label className="label pl-2 pt-4 text-sm italic">
-                                                    Select a venue to start attendance recording
+                                                    Select a venue to begin configuring an event
                                                 </label>
                                             }
-                                        </div>
-                                    </div>
-                                    <div className={selectedVenue ? 'hidden': 'flex flex-row card w-9/12 p-6 justify-center'}>
-                                        <div className="bg-gray-300 justify-center w-full m-4">
-                                            <div className="my-auto mx-auto">Select a venue to start attendance recording</div>
                                         </div>
                                     </div>
                                     {selectedVenue &&
@@ -526,7 +549,7 @@ export const Main = () => {
                                                                 }}
                                                                 className="checkbox"/>
                                                             <label
-                                                                className="label">
+                                                                className="label pl-2 pt-2">
                                                                 {i18n.t('Group Action?')}
                                                             </label>
                                                         </div>
@@ -590,10 +613,16 @@ export const Main = () => {
                                                                 <button type="button"
                                                                         className={loading || saving ? 'primary-btn-disabled' : 'primary-btn'}
                                                                         onClick={saveEdits}>
-                                                                    {(saving || loading) &&
-                                                                        <SpinnerComponent/>
-                                                                    }
-                                                                    Save Attendance
+                                                                    <div
+                                                                        className="flex flex-row">
+                                                                        {(saving || loading) &&
+                                                                            <div
+                                                                                className="pr-2">
+                                                                                <SpinnerComponent/>
+                                                                            </div>
+                                                                        }
+                                                                        <span> Save Attendance</span>
+                                                                    </div>
                                                                 </button>
                                                             }
                                                         </div>
@@ -660,11 +689,11 @@ export const Main = () => {
                                                                                 onChange={() => {
                                                                                     if (selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)) {
                                                                                         setSelectedEntities(selectedEntities.filter(rowId => rowId.trackedEntity !== entity.trackedEntity));
-                                                                                        setEdits(edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity))
+                                                                                        //setEdits(edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity))
                                                                                     } else {
                                                                                         setSelectedEntities([...selectedEntities, entity]);
 
-                                                                                        let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
+                                                                                        /*let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
                                                                                         if (!currentEdit) {
                                                                                             currentEdit = {
                                                                                                 entity
@@ -675,7 +704,7 @@ export const Main = () => {
                                                                                             currentEdit.values = sample.values;
 
                                                                                             setEdits([...edits, currentEdit]);
-                                                                                        }
+                                                                                        }*/
                                                                                     }
                                                                                 }}
                                                                                 className="checkbox"/>

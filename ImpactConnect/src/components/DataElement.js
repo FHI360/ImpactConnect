@@ -3,7 +3,15 @@ import { CalendarInput } from '@dhis2/ui';
 import PropTypes from 'prop-types';
 import React, { useEffect, useMemo, useState } from 'react';
 
-export const DataElementComponent = ({ dataElement, labelVisible = true, label, value, valueChanged, readonly, optionAdd = true }) => {
+export const DataElementComponent = ({
+                                         dataElement,
+                                         labelVisible = true,
+                                         label,
+                                         value,
+                                         valueChanged,
+                                         readonly,
+                                         optionAdd = true
+                                     }) => {
     const engine = useDataEngine();
 
     const [id, setId] = useState('');
@@ -16,6 +24,7 @@ export const DataElementComponent = ({ dataElement, labelVisible = true, label, 
     const [error, setError] = useState('');
     const [optionSetId, setOptionSetId] = useState('');
     const memorizedOptionSetId = useMemo(() => optionSetId, [optionSetId]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (dataElement?.optionSet?.id && dataElement?.optionSet.id !== optionSetId) {
@@ -34,11 +43,15 @@ export const DataElementComponent = ({ dataElement, labelVisible = true, label, 
                     }
                 }
             };
+
+            setLoading(true);
             engine.query(optionsQuery).then(d => {
                 setOptions(d.optionSet?.options.filter(o => !!o) || []);
                 setValueType(d.optionSet?.valueType);
                 setId(d.optionSet?.id);
                 setName(d.optionSet?.name);
+
+                setLoading(false);
             });
         }
     }, [memorizedOptionSetId]);
@@ -142,12 +155,18 @@ export const DataElementComponent = ({ dataElement, labelVisible = true, label, 
                                         setEdit(false);
                                         valueChanged(dataElement, event.target.value);
                                     }}>
-                                <option defaultValue={''}>Select one</option>
-                                {options.filter(option => !!option).map(option => (
-                                    <option key={option.code} value={option.code}>
-                                        {option.displayName}
-                                    </option>
-                                ))}
+                                {loading ? (
+                                    <option>Loading...</option>
+                                ) : (
+                                    <>
+                                        <option defaultValue={''}>Select one</option>
+                                        {options.filter(option => !!option).map(option => (
+                                            <option key={option.code} value={option.code}>
+                                                {option.displayName}
+                                            </option>
+                                        ))}
+                                    </>
+                                )}
                             </select>
                             {!edit && !readonly && optionAdd &&
                                 <div className="p-2" onClick={() => setEdit(true)}>+</div>
@@ -175,7 +194,7 @@ export const DataElementComponent = ({ dataElement, labelVisible = true, label, 
                         }
                     </div>
                 }
-                {!dataElement.optionSet?.id &&
+                {dataElement && !dataElement?.optionSet?.id &&
                     <>
                         {((dataElement.valueType === 'TRUE_ONLY' || dataElement.valueType === 'BOOLEAN')) &&
                             <div className="flex items-center mb-4">

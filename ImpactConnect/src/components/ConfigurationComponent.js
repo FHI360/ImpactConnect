@@ -43,6 +43,7 @@ const ConfigurationComponent = () => {
     const [editMode, setEditMode] = useState(false);
     const [stages, setStages] = useState([]);
     const [columnDisplay, setColumnDisplay] = useState(false);
+    const [scrollHeight, setScrollHeight] = useState('350px');
 
     const engine = useDataEngine();
 
@@ -179,6 +180,28 @@ const ConfigurationComponent = () => {
             }
         }
     }, [dataStore]);
+
+    useEffect(() => {
+        const adjustScrollHeight = () => {
+            const height = window.innerHeight;
+            if (height < 800) {
+                setScrollHeight('350px');
+            } else {
+                setScrollHeight('700px');
+            }
+        };
+
+        // Adjust scrollHeight initially
+        adjustScrollHeight();
+
+        // Add event listener to adjust on resize
+        window.addEventListener('resize', adjustScrollHeight);
+
+        // Clean up event listener on component unmount
+        return () => {
+            window.removeEventListener('resize', adjustScrollHeight);
+        };
+    }, []);
 
     const handleProgramChange = (event) => {
         setSelectedProgram(event);
@@ -340,7 +363,7 @@ const ConfigurationComponent = () => {
                                           enableOrderChange
                                 />
                             </div>
-                            <div className="card">
+                            {/*<div className="card">
                                 <label className="label">
                                     {i18n.t('Participant Filter Attribute(s)')}
                                 </label>
@@ -354,7 +377,7 @@ const ConfigurationComponent = () => {
                                           }}
                                           enableOrderChange
                                 />
-                            </div>
+                            </div>*/}
                             <div className="card">
                                 <div
                                     className="flex items-center">
@@ -367,7 +390,7 @@ const ConfigurationComponent = () => {
                                         }}
                                         className="checkbox"/>
                                     <label
-                                        className="label">
+                                        className="label pl-2 pt-2">
                                         {i18n.t('Group Action?')}
                                     </label>
                                 </div>
@@ -381,11 +404,11 @@ const ConfigurationComponent = () => {
                                     />
                                 </div>
                             </div>
-                            {groupEdit &&
+                            {selectedProgram &&
                                 <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
                                     <label htmlFor="program"
                                            className="block mb-2 text-sm font-semibold text-gray-900 dark:text-white">
-                                        {i18n.t('Configure Individual Data Elements')}
+                                        {i18n.t('Configure Data Elements')}
                                     </label>
                                     <div className="shadow-md rounded-md p-4 bg-white mb-4">
                                         <label htmlFor="program"
@@ -499,10 +522,14 @@ const ConfigurationComponent = () => {
                                                     dataStoreOperation('configuredStages', stages);
                                                 }}
                                                 onSave={() => {
-                                                    stages[selectedStage] = {
-                                                        ...stages[selectedStage],  // Spread to retain existing properties
-                                                        individualDataElements: [...selectedIndividualDataElements], // Clone array to prevent reference issues
-                                                    };
+                                                    const updated = {
+                                                        ...configuredStages,
+                                                        [selectedStage]: {
+                                                            ...configuredStages[selectedStage],  // Retain existing properties
+                                                            individualDataElements: [...selectedIndividualDataElements], // Clone array to prevent reference issues
+                                                        }
+                                                    }
+                                                    dataStoreOperation('configuredStages', updated);
                                                     setEditMode(false);
                                                     setConfigureMode(true)
                                                 }}
@@ -529,15 +556,13 @@ const ConfigurationComponent = () => {
 
                                                         // Update the configured stages with modified data
                                                         setConfiguredStages(updatedStages);
-
-                                                        // Persist the updated stages to the datastore
-                                                        dataStoreOperation('configuredStages', updatedStages);
                                                     }
 
                                                     // Clear the selected stage and reset modes
                                                     setSelectedStage('');
                                                     setConfigureMode(false);
-                                                    setEditMode(false);                                                }}
+                                                    setEditMode(false);
+                                                }}
                                             />
                                         </div>
                                     }

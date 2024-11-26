@@ -19,6 +19,7 @@ import { Navigation } from './Navigation.js';
 import OrganisationUnitComponent from './OrganisationUnitComponent.js';
 import { SearchComponent } from './SearchComponent.js';
 import { SpinnerComponent } from './SpinnerComponent.js';
+import { VenueComponent } from './VenueComponent';
 
 export const EventsComponent = () => {
     const engine = useDataEngine();
@@ -39,7 +40,6 @@ export const EventsComponent = () => {
     const [participantsProgram, setParticipantsProgram] = useState('');
     const [trainingProgram, setTrainingProgram] = useState('');
     const [nameAttributes, setNameAttributes] = useState([]);
-    const [filterAttributes, setFilterAttributes] = useState([]);
     const [eventNameAttribute, setEventNameAttribute] = useState('');
     const [page, setPage] = useState(1);
     const [totalEntities, setTotalEntities] = useState(0);
@@ -54,6 +54,7 @@ export const EventsComponent = () => {
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(false);
     const [editMode, setEditMode] = useState(false);
+    const [scrollHeight, setScrollHeight] = useState('350px');
 
     const memoizedData = useMemo(() => {
         return {
@@ -71,17 +72,6 @@ export const EventsComponent = () => {
             resource: `dataStore/${config.dataStoreName}?fields=.`,
         }
     };
-
-    const attributesQuery = {
-        attributes: {
-            resource: `trackedEntityAttributes`,
-            params: ({program}) => ({
-                fields: ['id', 'displayName', 'optionSet(id)', 'valueType'],
-                paging: 'false',
-                program: program
-            }),
-        }
-    }
 
     const organisationsQuery = {
         orgUnits: {
@@ -110,10 +100,6 @@ export const EventsComponent = () => {
         }
     }
 
-    const {
-        data: dataTrainingAttributes,
-    } = useDataQuery(attributesQuery, {variables: {program: trainingProgram}});
-
     const {data: entityData, refetch} = useDataQuery(entitiesQuery, {
         variables: {
             program: participantsProgram,
@@ -137,22 +123,11 @@ export const EventsComponent = () => {
 
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
-    const {data: programAttributes} = useDataQuery({
-        programs: {
-            resource: `programs`,
-            params: {
-                fields: ['id, programTrackedEntityAttributes(trackedEntityAttribute(id, valueType))'],
-                paging: 'false'
-            },
-        }
-    })
-
     useEffect(() => {
         if (dataStore?.dataStore?.entries) {
             const entry = dataStore.dataStore.entries.find(e => e.key === `${config.dataStoreKey}`);
             if (entry) {
                 setNameAttributes(entry.value.nameAttributes || []);
-                setFilterAttributes(entry.value.filterAttributes || []);
                 setTrainingAttributes(entry.value.trainingAttributes || []);
                 setTrainingProgram(entry.value.trainingProgram);
                 setParticipantsProgram(entry.value.participantsProgram);
@@ -194,29 +169,29 @@ export const EventsComponent = () => {
     }, [pageSize, page])
 
     useEffect(() => {
-        if (dataTrainingAttributes?.attributes?.trackedEntityAttributes) {
-            setTrainingAttributesData(dataTrainingAttributes?.attributes?.trackedEntityAttributes)
-        }
-    }, [trainingAttributesData, trainingProgram]);
-
-    useEffect(() => {
         pageParticipants(1, participantPageSize);
     }, [participants]);
 
     useEffect(() => {
-        if (programAttributes && programAttributes.programs) {
-            const program = programAttributes.programs.programs.find(p => p.id === trainingProgram);
-            if (program) {
-                const attributes = program.programTrackedEntityAttributes.map(tea => {
-                    return {
-                        id: tea.trackedEntityAttribute.id,
-                        valueType: tea.trackedEntityAttribute.valueType
-                    }
-                });
-                setTrainingAttributesData(attributes);
+        engine.query({
+            programs: {
+                resource: `programs`,
+                params: {
+                    fields: ['id, programTrackedEntityAttributes(trackedEntityAttribute(id, valueType,displayName,optionSet(id)))'],
+                    paging: 'false'
+                },
             }
-        }
-
+        }).then(res => {
+            if (res && res.programs) {
+                const program = res.programs.programs.find(p => p.id === trainingProgram);
+                if (program) {
+                    const attributes = program.programTrackedEntityAttributes.map(tea => {
+                        return tea.trackedEntityAttribute
+                    });
+                    setTrainingAttributesData(attributes);
+                }
+            }
+        })
     }, [trainingProgram]);
 
     useEffect(() => {
@@ -276,14 +251,31 @@ export const EventsComponent = () => {
         }
     }, [selectedTraining]);
 
+    useEffect(() => {
+        const adjustScrollHeight = () => {
+            const height = window.innerHeight;
+            if (height < 800) {
+                setScrollHeight('350px');
+            } else {
+                setScrollHeight('700px');
+            }
+        };
+
+        // Adjust scrollHeight initially
+        adjustScrollHeight();
+
+        // Add event listener to adjust on resize
+        window.addEventListener('resize', adjustScrollHeight);
+
+        // Clean up event listener on component unmount
+        return () => {
+            window.removeEventListener('resize', adjustScrollHeight);
+        };
+    }, []);
+
     const orgUnitChanged = event => {
         setOrgUnit(event.id);
         setSelectedOu(event.selected)
-    }
-
-    const handleVenueChange = event => {
-        setSelectedVenue(event.id);
-        setVenue(event.selected)
     }
 
     const addSelection = () => {
@@ -303,23 +295,6 @@ export const EventsComponent = () => {
             [dataElement.id]: value,
         }));
     }, []);
-
-    const filterEntities = () => {
-        const entities = allEntities.filter(entity => {
-            const filter = Object.keys(filterAttributes).map(filterAttr => {
-                const value = filterAttributes[filterAttr];
-                if (value && (value + '').length > 0) {
-                    const attribute = entity.attributes.find(attr => attr.attribute === filterAttr);
-                    return attrDataElementComponentibute && attribute.value + '' === value + '';
-                }
-                return true;
-            })
-
-            return !filter.length || filter.every(f => f);
-
-        });
-        setEntities(entities);
-    }
 
     const uniqueName = () => {
         return `${groupDataElementValue(EVENT_OPTIONS.attributes.event)}_${new Date(groupDataElementValue(EVENT_OPTIONS.attributes.startDate)).toISOString().substring(0, 10)}_${new Date(groupDataElementValue(EVENT_OPTIONS.attributes.endDate)).toISOString().substring(0, 10)}`
@@ -359,9 +334,8 @@ export const EventsComponent = () => {
 
         attributes.push({
             attribute: EVENT_OPTIONS.attributes.days,
-            value: daysBetween(groupDataElementValue(EVENT_OPTIONS.attributes.startDate), groupDataElementValue(EVENT_OPTIONS.attributes.endDate))
+            value: daysBetween(new Date(groupDataElementValue(EVENT_OPTIONS.attributes.startDate)), new Date(groupDataElementValue(EVENT_OPTIONS.attributes.endDate)))
         });
-
         let entity = {
             orgUnit: selectedVenue,
             trackedEntityType: entityType,
@@ -519,15 +493,13 @@ export const EventsComponent = () => {
                                     <div className="flex flex-col w-full mb-2">
                                         <div className="w-full flex flex-row pt-2 gap-x-1">
                                             <div className={selectedVenue ? 'w-3/12 flex flex-col card gap-x-1' : 'w-full flex flex-col card gap-x-1'}>
-                                                <div className="w-3/12 p-3">
+                                                <div className={!selectedVenue ? 'w-3/12 p-3' : 'w-10/12 p-3'}>
                                                     <label htmlFor="stage"
                                                            className="label">
                                                         {i18n.t('Event Venue')}
                                                     </label>
-                                                    <OrganisationUnitComponent
-                                                        handleOUChange={handleVenueChange}
-                                                        selectedOU={venue}
-                                                    />
+                                                    <VenueComponent
+                                                        venueSelected={(venue) => setSelectedVenue(venue)}/>
                                                     {!selectedVenue &&
                                                         <label className="label pl-2 pt-4 text-sm italic">
                                                             Select a venue to begin configuring an event
@@ -579,10 +551,16 @@ export const EventsComponent = () => {
                                                                         disabled={saving || loading}
                                                                         className={loading || saving || !validateTraining() ? 'primary-btn-disabled' : 'primary-btn'}
                                                                 >
-                                                                    {saving &&
-                                                                        <SpinnerComponent/>
-                                                                    }
-                                                                    {editMode ? 'Update Event' : 'Create New Event'}
+                                                                    <div
+                                                                        className="flex flex-row">
+                                                                        {(saving || loading) &&
+                                                                            <div
+                                                                                className="pr-2">
+                                                                                <SpinnerComponent/>
+                                                                            </div>
+                                                                        }
+                                                                        <span>{editMode ? 'Update Event' : 'Create New Event'}</span>
+                                                                    </div>
                                                                 </button>
                                                             </div>
                                                         }

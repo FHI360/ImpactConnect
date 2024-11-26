@@ -1,0 +1,385 @@
+/* CSS */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+}
+
+.containerNav {
+    margin: 1rem;
+    text-align: center;
+}
+
+.nav {
+    background-color: #DCE1EA;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    top: 0;
+
+}
+
+.site-title {
+    font-size: 2rem;
+}
+
+.nav ul {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    display: flex;
+    background-color: #c1bfbf;
+    /* gap: 20rem; */
+    /* background-color: #2C6693; */
+}
+
+.nav a {
+    color: white;
+    text-decoration: none;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: .25rem;
+    justify-content: center;
+
+
+}
+
+.nav li {
+
+    color: white;
+    height: 50px;
+    width: 200px;
+    font-size: large;
+    font-weight: bold;
+
+
+}
+
+/* .nav ul.active {
+  background-color: #2C6693;
+} */
+
+.nav li:hover {
+    background-color: #555;
+    color: white;
+}
+
+.nav a:hover {
+    background-color: #555;
+    color: white;
+}
+
+
+.customLinkActive {
+    background-color: #555;
+    color: white !important;
+}
+
+.topnav {
+    background-color: #E5E8F3;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+
+}
+
+
+.topnav a {
+    color: #2C6693;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+
+.topnav a:hover {
+    background-color: #2C6693;
+    color: #fff;
+}
+
+.middle {
+    display: flex;
+    margin-bottom: 50px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.main {
+    /* margin-left: 303px; */
+    margin-left: 263px;
+    display: flex;
+    flex-grow: 1;
+    border: 1px dotted black;
+}
+
+.headerTitle {
+    margin-left: 266px;
+    margin-top: 50px;
+
+}
+
+.RuleDescription {
+
+    border: 1px solid #00796B;
+    margin-top: 50px;
+    display: flex;
+    padding: 5px;
+}
+
+.panelmiddle {
+    width: 30%;
+    padding: 20px 20px 20px 20px;
+    margin: 5px;
+    border-color: black;
+
+    border: 1px solid rgb(46, 44, 44);
+}
+
+.panelRight {
+    width: 70%;
+    padding: 20px 20px 20px 20px;
+    border: 1px;
+    margin: 5px;
+}
+
+.sidenav {
+    background-color: #F3F3F3;
+    width: 263px;
+    position: fixed;
+    top: 100px;
+    bottom: 0px;
+    left: 0;
+    z-index: 0;
+}
+
+.searchPanel {
+    background-color: #F3F3F3;
+    top: 200px;
+    bottom: 0px;
+    left: 0;
+    z-index: 0;
+}
+
+.marginTop {
+    margin-top: 20px;
+}
+
+
+.OrgUnitContainer {
+    border-color: #2C6693;
+    border: #818181;
+    color: white;
+    height: 450px; /* Set the maximum height as needed */
+    overflow-y: auto; /* Enable vertical scroll */
+    background-color: #fff;
+    border: 1px solid #ccc; /* Add border */
+}
+
+.disabled {
+    opacity: 0.5; /* Makes the div look faded */
+    pointer-events: none; /* Disables all mouse events on this div */
+    cursor: not-allowed; /* Shows a not-allowed cursor when hovered */
+}
+
+.deletedItem {
+    color: #ae0f0f !important;
+    text-decoration: line-through;
+}
+
+/* .OrgUnitContainer span.selected  {
+  background-color: blue !important;
+} */
+.checked {
+    background-color: blue !important;
+    color: #ae0f0f !important;
+}
+
+.programAttributeEmptyContainer {
+    width: 100%;
+    height: 60px;
+    background-color: #DCE1EA;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.updateSaveProgramAttributeBtn {
+
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: center;
+
+
+}
+
+.sidenav a {
+    padding: 10px 8px 10px 16px;
+    text-decoration: none;
+    font-size: 18px;
+    color: #818181;
+    display: block;
+}
+
+.sidenav a:hover {
+    color: #f1f1f1;
+}
+
+footer {
+    background-color: #2C6693;
+    color: #E5E8F3;
+    text-align: center;
+    padding: 10px;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+.largeIcon {
+    width: 30px;
+    height: 26px
+}
+
+.logo-img {
+    width: 100%; /* Reduces the width to 50% of the parent container */
+    height: auto; /* Maintains aspect ratio */
+}
+
+.logo_half_size {
+    width: 20%; /* Reduces the width to 50% of the parent container */
+    height: 20%;
+}
+
+.smallIcon {
+    width: 18px;
+    /* height: 12px   */
+}
+
+.dataTableProjectAttributes {
+    width: 30vw;
+}
+
+.searchResultPage {
+    justify-content: center;
+    padding: 0 10%;
+    background-color: #efefef;
+    margin-bottom: 50px;
+    height: 100%;
+}
+
+.searchResultPageHeader {
+    background-color: #ae0f0f;
+    height: 100%;
+}
+
+.searchResultPageControls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    margin-top: 70px;
+
+}
+
+.customImageContainer {
+
+    cursor: pointer;
+}
+
+.dataTableMargin {
+    margin-top: 10px;
+}
+
+.iconAddNewProject {
+    color: #efefef;
+    padding-top: 10px;
+
+
+}
+
+.matchThreshold {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+
+    /* align-items: center;
+
+    */
+}
+
+.threshLabel {
+    font-size: 14px;
+}
+
+.threshDescription {
+    font-size: 12px;
+    color: #666;
+    margin: 8px 0 0 0;
+}
+
+.thresholdPanelDescription {
+
+    border: 1px solid #00796B;
+    margin-top: 5px;
+    display: flex;
+    padding: 5px;
+}
+
+.thresholdPanelDescription2 {
+
+    border: 1px solid #00796B;
+    margin-top: 5px;
+    /* display: flex; */
+    padding: 5px;
+}
+
+/* customStyles.css */
+.customButton {
+    background-color: #00897B;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.customButton:hover {
+    background-color: darkpurple;
+}
+
+/* src/SliderComponent.css */
+.slider-container {
+    width: 100%;
+    margin: auto;
+    text-align: center;
+}
+
+.horizontalSlider {
+    width: 100%;
+    height: 25px;
+}
+
+.sliderThumb {
+    height: 25px;
+    width: 25px;
+    background-color: #00897B;
+    cursor: grab;
+    border-radius: 50%;
+}
+
+.sliderTrack {
+    top: 0;
+    bottom: 0;
+    background: #ddd;
+    border-radius: 5px;
+}
