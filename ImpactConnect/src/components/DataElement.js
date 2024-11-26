@@ -1,7 +1,9 @@
-import { useDataEngine } from '@dhis2/app-runtime';
+import { useAlert, useDataEngine } from '@dhis2/app-runtime';
+import i18n from '@dhis2/d2-i18n';
 import { CalendarInput } from '@dhis2/ui';
 import PropTypes from 'prop-types';
 import React, { useEffect, useMemo, useState } from 'react';
+import { SpinnerComponent } from './SpinnerComponent.js';
 
 export const DataElementComponent = ({
                                          dataElement,
@@ -19,12 +21,20 @@ export const DataElementComponent = ({
     const [options, setOptions] = useState([]);
     const [valueType, setValueType] = useState('');
     const [edit, setEdit] = useState(false);
+    const [renameMode, setRenameMode] = useState(false);
     const [optionLabel, setOptionLabel] = useState('');
     const [optionValue, setOptionValue] = useState();
     const [error, setError] = useState('');
     const [optionSetId, setOptionSetId] = useState('');
-    const memorizedOptionSetId = useMemo(() => optionSetId, [optionSetId]);
     const [loading, setLoading] = useState(false);
+    const [selectedValue, setSelectedValue] = useState('');
+
+    const memorizedOptionSetId = useMemo(() => optionSetId, [optionSetId]);
+
+    const {show} = useAlert(
+        ({msg}) => msg,
+        ({type}) => ({[type]: true})
+    )
 
     useEffect(() => {
         if (dataElement?.optionSet?.id && dataElement?.optionSet.id !== optionSetId) {
@@ -56,12 +66,46 @@ export const DataElementComponent = ({
         }
     }, [memorizedOptionSetId]);
 
+    const renameOption = () => {
+        const option = options.find(opt => opt.code === selectedValue);
+        if (option) {
+            setLoading(true);
+            option.displayName = optionLabel.replace(/\s+/g, ' ').trim();
+            engine.mutate({
+                resource: 'options',
+                type: 'update',
+                id: option.id,
+                data: {
+                    name: option.displayName,
+                    code: option.code,
+                    optionSet: {
+                        id: optionSetId
+                    }
+                }
+            }).then(_ => {
+                show({msg: i18n.t('Option successfully updated'), type: 'success'});
+
+                setOptions(prev => {
+                    const updatedOptions = prev.filter(opt => opt.code !== option.code);
+                    updatedOptions.push(option);
+                    return updatedOptions;
+                });
+
+                setEdit(false);
+                setLoading(false);
+            });
+        }
+    }
+
     const addOption = () => {
+        setLoading(true);
+
+        const label = optionLabel.replace(/\s+/g, ' ').trim();
         const option = {
-            displayName: optionLabel,
+            displayName: label,
             code: valueType.includes('TEXT') ? optionLabel : null
         };
-        const existing = options.find(option => option.displayName.replace(/\s+/g, ' ').trim().toLowerCase() === optionLabel.toLowerCase());
+        const existing = options.find(option => option.displayName.replace(/\s+/g, ' ').trim().toLowerCase() === label.toLowerCase());
         if (existing) {
             setOptionValue(existing.code);
             setEdit(false);
@@ -105,6 +149,9 @@ export const DataElementComponent = ({
                         }).then(res => {
                             if (res.status === 'OK') {
                                 setOptionValue(option.code);
+
+                                show({msg: i18n.t('Option successfully added'), type: 'success'});
+                                setLoading(false);
                                 setEdit(false);
                                 valueChanged(dataElement, option.code);
                             }
@@ -154,12 +201,13 @@ export const DataElementComponent = ({
                                     onChange={(event) => {
                                         setEdit(false);
                                         valueChanged(dataElement, event.target.value);
+                                        setSelectedValue(event.target.value);
                                     }}>
                                 {loading ? (
                                     <option>Loading...</option>
                                 ) : (
                                     <>
-                                        <option defaultValue={''}>Select one</option>
+                                        <option defaultValue={null}>Select one</option>
                                         {options.filter(option => !!option).map(option => (
                                             <option key={option.code} value={option.code}>
                                                 {option.displayName}
@@ -169,7 +217,40 @@ export const DataElementComponent = ({
                                 )}
                             </select>
                             {!edit && !readonly && optionAdd &&
-                                <div className="p-2" onClick={() => setEdit(true)}>+</div>
+                                <>
+                                    {(!value || value === 'Select one') &&
+                                        <div className="p-2" onClick={() => {
+                                            setEdit(true);
+                                            setSelectedValue('');
+                                            setRenameMode(false);
+                                        }}>+</div>
+                                    }
+                                    {value && value !== 'Select one' &&
+                                        <div className="p-2" onClick={() => {
+                                            setEdit(true);
+                                            setRenameMode(true);
+                                            const option = options.find(opt => opt.code === selectedValue);
+                                            setOptionLabel(option?.displayName)
+                                        }}>
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                strokeWidth="1.5"
+                                                stroke="currentColor"
+                                                aria-hidden="true"
+                                                width="24"
+                                                height="24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                                                />
+                                            </svg>
+                                        </div>
+                                    }
+                                </>
                             }
                         </div>
                         {edit &&
@@ -177,14 +258,26 @@ export const DataElementComponent = ({
                                 <div className="w-9/12">
                                     <input
                                         type="text"
+                                        value={optionLabel}
                                         onChange={(event) => {
-                                            setOptionLabel(event.target.value.replace(/\s+/g, ' ').trim())
+                                            setOptionLabel(event.target.value)
                                         }}
                                         className="text-input"/>
                                 </div>
                                 {optionLabel &&
-                                    <button type="button" onClick={addOption} className="primary-btn">
-                                        Add
+                                    <button type="button" onClick={renameMode ? renameOption : addOption}
+                                            disabled={loading}
+                                            className={loading ? 'primary-btn-disabled' : 'primary-btn'}>
+                                        <div
+                                            className="flex flex-row">
+                                            {loading &&
+                                                <div
+                                                    className="pr-2">
+                                                    <SpinnerComponent/>
+                                                </div>
+                                            }
+                                            <span>{renameMode ? 'Rename' : 'Add'}</span>
+                                        </div>
                                     </button>
                                 }
                                 <button type="button" onClick={() => setEdit(false)} className="default-btn">
