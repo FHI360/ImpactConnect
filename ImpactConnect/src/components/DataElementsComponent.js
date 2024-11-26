@@ -11,7 +11,7 @@ export const DataElementsComponent = React.memo(({
                 const de = data.trainingAttributesData.find(ta => ta.id === cde);
                 if (de && cde !== data.eventNameAttribute) {
                     return <>
-                        <div className="w-6/12 p-2">
+                        <div className="w-full p-2">
                             <DataElementComponent key={idx}
                                                   value={data.groupValues[cde]}
                                                   dataElement={de}

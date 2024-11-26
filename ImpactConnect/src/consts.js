@@ -27,6 +27,7 @@ export const footerText = `Copyright © FHI360 | EpiC | Business Solutions | 202
 export const project_description = 'This application resolves duplicate issues'
 export const panelAction = 'Finding duplicate tracked entities'
 
+export const VENUE_NAME = 'Training/Meeting/Workshop Venues';
 export const TRAINING_STAGES = {
     TRAINING: 'SmUprI011oN',
     WORKSHOP: 'rPMeg1cK9Pu',

@@ -1,61 +1,37 @@
-import classnames from 'classnames';
 import React from 'react'
 import { Link, useMatch, useNavigate, } from 'react-router-dom';
-import { MainTitle } from '../consts';
+import classes from '../App.module.css'
 
 function NavigationItem({to, children, ...props}) {
     // function to navigate to different route
     const navigate = useNavigate()
-
 
     // "null" when not active, "object" when active
     const routeMatch = useMatch(to)
 
     // path is matched if routeMatch is not null ${isActive ? "active" : ""}  customLinkActive
     const isActive = Boolean(routeMatch)
-    const onClick = () => navigate(to)
-    const classess = classnames({
-            'block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 md:hover:bg-transparent md:hover:text-blue-700 md:p-0 md:dark:hover:text-blue-500 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white md:dark:hover:bg-transparent dark:border-gray-700': !isActive
-        },
-        {'block py-2 px-3 text-white bg-blue-700 rounded md:bg-transparent md:text-blue-700 md:p-0 md:dark:text-blue-500': isActive}
-    )
+    const onClick = () => navigate(to);
 
     return (
-        <button type="button"
-                onClick={onClick}
-                className={classess}>
+        <li className={(isActive ? ` ${classes.customLinkActive}` : '')} onClick={onClick}>
             <Link to={to} {...props}>
                 {children}
             </Link>
-        </button>
+        </li>
     )
 }
 
 export const Navigation = () => {
     return <>
-        <div className="relative top-0 left-0">
-            <div
-                className="relative top-0 left-0 z-50 w-full h-16 bg-white border-t border-gray-200 dark:bg-gray-700 dark:border-gray-600">
-                <a href="#" className="flex items-center pb-4 border-b border-b-gray-800">
-                    <div className="text-center w-full">
-                        <h2 className="font-bold text-2xl">{MainTitle}</h2>
-                    </div>
-                </a>
-            </div>
-            <div
-                className="relative top-0 left-0 z-50 w-full h-16 bg-white border-t border-gray-200 dark:bg-gray-700 dark:border-gray-600">
-                <div className="grid h-full max-w-lg grid-cols-4 mx-auto font-medium">
-                    <NavigationItem to="/">
-                        <span>Home</span>
-                    </NavigationItem>
-                    <NavigationItem to="/events">
-                        <span>Events</span>
-                    </NavigationItem>
-                    <NavigationItem to="/configure">
-                        <span>Configuration</span>
-                    </NavigationItem>
-                </div>
-            </div>
+        <div>
+            <nav className={classes.nav}>
+                <ul>
+                    <NavigationItem to="/">Home</NavigationItem>
+                    <NavigationItem to="/events">Events</NavigationItem>
+                    <NavigationItem to="/configure">Configuration</NavigationItem>
+                </ul>
+            </nav>
         </div>
     </>
 }
