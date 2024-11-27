@@ -492,8 +492,8 @@ export const EventsComponent = () => {
                                 <div className="flex flex-col">
                                     <div className="flex flex-col w-full mb-2">
                                         <div className="w-full flex flex-row pt-2 gap-x-1">
-                                            <div className={selectedVenue ? 'w-3/12 flex flex-col card gap-x-1' : 'w-full flex flex-col card gap-x-1'}>
-                                                <div className={!selectedVenue ? 'w-3/12 p-3' : 'w-10/12 p-3'}>
+                                            <div className="w-full flex flex-col card gap-x-1">
+                                                <div className="w-3/12 p-3">
                                                     <label htmlFor="stage"
                                                            className="label">
                                                         {i18n.t('Event Venue')}
@@ -506,173 +506,171 @@ export const EventsComponent = () => {
                                                         </label>
                                                     }
                                                 </div>
-                                            </div>
-                                            {selectedVenue &&
-                                                <div className="w-9/12 p-8 mt-6 lg:mt-0 rounded shadow bg-white">
-                                                    <div
-                                                        className="relative overflow-x-auto shadow-md sm:rounded-lg w-full">
-                                                        <div className="flex flex-row gap-x-2 m-2 border-b-2 border-blue-500">
-                                                            <div className="flex items-center mb-4">
-                                                                <input type="radio"
-                                                                       checked={editMode === false}
-                                                                       name="mode"
-                                                                       onClick={() => {
-                                                                           setEditMode(false);
-                                                                           setGroupValues(Object.assign({}));
-                                                                           setParticipants([]);
-                                                                       }}
-                                                                       className="radio"/>
-                                                                <label htmlFor="default-radio-1"
-                                                                       className="label pl-2 pt-2">
-                                                                    Configure New Event
-                                                                </label>
-                                                            </div>
-                                                            <div className="flex items-center mb-4">
-                                                                <input type="radio"
-                                                                       name="mode"
-                                                                       checked={editMode === true}
-                                                                       onClick={() => {
-                                                                           setEditMode(true);
-                                                                           setGroupValues(Object.assign({}));
-                                                                           setSelectedTraining('');
-                                                                           setParticipants([]);
-                                                                       }}
-                                                                       className="radio"/>
-                                                                <label htmlFor="default-radio-2"
-                                                                       className="label pl-2 pt-2">
-                                                                    Update Existing Event
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                        {(trainingAttributes || []).length > 0 && selectedVenue &&
-                                                            <div className="flex flex-row justify-end">
-                                                                <button type="button"
-                                                                        onClick={saveTraining}
-                                                                        disabled={saving || loading}
-                                                                        className={loading || saving || !validateTraining() ? 'primary-btn-disabled' : 'primary-btn'}
-                                                                >
-                                                                    <div
-                                                                        className="flex flex-row">
-                                                                        {(saving || loading) &&
-                                                                            <div
-                                                                                className="pr-2">
-                                                                                <SpinnerComponent/>
-                                                                            </div>
-                                                                        }
-                                                                        <span>{editMode ? 'Update Event' : 'Create New Event'}</span>
-                                                                    </div>
-                                                                </button>
-                                                            </div>
-                                                        }
-                                                        <div className="flex flex-col w-4/12">
-                                                            {selectedVenue && editMode &&
-                                                                <div className="w-full p-2">
-                                                                    <label htmlFor="program"
-                                                                           className="label">
-                                                                        Existing Events
+                                                {selectedVenue &&
+                                                    <div className="w-full p-8 mt-6 lg:mt-0 rounded shadow bg-white border-t-2 border-blue-500">
+                                                        <div
+                                                            className="relative overflow-x-auto shadow-md sm:rounded-lg w-full">
+                                                            <div className="flex flex-row gap-x-2 m-2 border-b-2 border-blue-500">
+                                                                <div className="flex items-center mb-4">
+                                                                    <input type="radio"
+                                                                           checked={editMode === false}
+                                                                           name="mode"
+                                                                           onClick={() => {
+                                                                               setEditMode(false);
+                                                                               setGroupValues(Object.assign({}));
+                                                                               setParticipants([]);
+                                                                           }}
+                                                                           className="radio"/>
+                                                                    <label htmlFor="default-radio-1"
+                                                                           className="label pl-2 pt-2">
+                                                                        Configure New Event
                                                                     </label>
-                                                                    <select
-                                                                        className="select"
-                                                                        value={selectedTraining}
-                                                                        onChange={(event) => {
-                                                                            setSelectedTraining(event.target.value);
-                                                                        }}>
-                                                                        <option
-                                                                            selected>Select event
-                                                                        </option>
-                                                                        {trainings.map(option => {
-                                                                                return <>
-                                                                                    <option
-                                                                                        value={option.id}>{option.label}</option>
-                                                                                </>
+                                                                </div>
+                                                                <div className="flex items-center mb-4">
+                                                                    <input type="radio"
+                                                                           name="mode"
+                                                                           checked={editMode === true}
+                                                                           onClick={() => {
+                                                                               setEditMode(true);
+                                                                               setGroupValues(Object.assign({}));
+                                                                               setSelectedTraining('');
+                                                                               setParticipants([]);
+                                                                           }}
+                                                                           className="radio"/>
+                                                                    <label htmlFor="default-radio-2"
+                                                                           className="label pl-2 pt-2">
+                                                                        Update Existing Event
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                            {(trainingAttributes || []).length > 0 && selectedVenue &&
+                                                                <div className="flex flex-row justify-end">
+                                                                    <button type="button"
+                                                                            onClick={saveTraining}
+                                                                            disabled={saving || loading}
+                                                                            className={loading || saving || !validateTraining() ? 'primary-btn-disabled' : 'primary-btn'}
+                                                                    >
+                                                                        <div
+                                                                            className="flex flex-row">
+                                                                            {(saving || loading) &&
+                                                                                <div
+                                                                                    className="pr-2">
+                                                                                    <SpinnerComponent/>
+                                                                                </div>
                                                                             }
-                                                                        )}
-                                                                    </select>
+                                                                            <span>{editMode ? 'Update Event' : 'Create New Event'}</span>
+                                                                        </div>
+                                                                    </button>
                                                                 </div>
                                                             }
-                                                            {selectedVenue && ((editMode && selectedTraining) || !editMode) &&
-                                                                <DataElementsComponent data={memoizedData}
-                                                                                       valueChange={createOrUpdateGroupEvent}/>
-                                                            }
+                                                            <div className="flex flex-col w-4/12">
+                                                                {selectedVenue && editMode &&
+                                                                    <div className="w-full p-2">
+                                                                        <label htmlFor="program"
+                                                                               className="label">
+                                                                            Existing Events
+                                                                        </label>
+                                                                        <select
+                                                                            className="select"
+                                                                            value={selectedTraining}
+                                                                            onChange={(event) => {
+                                                                                setSelectedTraining(event.target.value);
+                                                                            }}>
+                                                                            <option
+                                                                                selected>Select event
+                                                                            </option>
+                                                                            {trainings.map(option => {
+                                                                                    return <>
+                                                                                        <option
+                                                                                            value={option.id}>{option.label}</option>
+                                                                                    </>
+                                                                                }
+                                                                            )}
+                                                                        </select>
+                                                                    </div>
+                                                                }
+                                                                {selectedVenue && ((editMode && selectedTraining) || !editMode) &&
+                                                                    <DataElementsComponent data={memoizedData}
+                                                                                           valueChange={createOrUpdateGroupEvent}/>
+                                                                }
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            }
+                                                }
+                                            </div>
                                         </div>
                                         {participants && selectedVenue &&
                                             <div className="w-full flex flex-col pt-2">
-                                                <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
-                                                    <div
-                                                        className={loading ? 'opacity-20 relative overflow-x-auto shadow-md sm:rounded-l' : 'relative overflow-x-auto shadow-md sm:rounded-l'}>
-                                                        {loading &&
-                                                            <SpinnerComponent/>
-                                                        }
-                                                        <table
-                                                            className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                                                            <caption
-                                                                className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
+                                                <div
+                                                    className={loading ? 'opacity-20 relative overflow-x-auto shadow-md sm:rounded-l' : 'relative overflow-x-auto shadow-md sm:rounded-l'}>
+                                                    {loading &&
+                                                        <SpinnerComponent/>
+                                                    }
+                                                    <table
+                                                        className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                                        <caption
+                                                            className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
 
-                                                                <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
-                                                                    Training /Workshop participants
-                                                                </p>
-                                                            </caption>
-                                                            <thead
-                                                                className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                                            <tr>
-                                                                <th data-priority="1"
-                                                                    className="px-6 py-3 w-1/12">#
-                                                                </th>
-                                                                <th data-priority="2"
-                                                                    className="px-6 py-3 w-6/12">Profile
-                                                                </th>
-                                                                <th data-priority="2"
-                                                                    className="px-6 py-3 w-3/12">Org Unit
-                                                                </th>
-                                                                <th className="w-2/12"></th>
-                                                            </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                            {pagedParticipants.map((entity, index) => {
-                                                                return <>
-                                                                    <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
-                                                                        <td>{index + 1}</td>
-                                                                        <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
-                                                                        <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
-                                                                        <td>
-                                                                            <button type="button"
-                                                                                    className="warn-btn"
-                                                                                    onClick={() => {
-                                                                                        removeParticipant(entity)
-                                                                                    }}>Remove
-                                                                            </button>
-                                                                        </td>
-                                                                    </tr>
-                                                                </>
-                                                            })}
-                                                            </tbody>
-                                                            <tfoot>
-                                                            <tr>
-                                                                <th className="w-full p-2" colSpan={4}>
-                                                                    <div
-                                                                        className="flex flex-row w-full justify-end">
-                                                                        <Pagination
-                                                                            page={participantsPage}
-                                                                            pageSize={participantPageSize}
-                                                                            pageCount={Math.ceil(participants.length / participantPageSize)}
-                                                                            total={participants.length}
-                                                                            onPageChange={(page) => pageParticipants(page)}
-                                                                            onPageSizeChange={(size) => {
-                                                                                setParticipantsPage(1);
-                                                                                setParticipantPageSize(size);
-                                                                                pageParticipants(1, size);
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                </th>
-                                                            </tr>
-                                                            </tfoot>
-                                                        </table>
-                                                    </div>
+                                                            <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                                                Training /Workshop participants
+                                                            </p>
+                                                        </caption>
+                                                        <thead
+                                                            className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                        <tr>
+                                                            <th data-priority="1"
+                                                                className="px-6 py-3 w-1/12">#
+                                                            </th>
+                                                            <th data-priority="2"
+                                                                className="px-6 py-3 w-6/12">Profile
+                                                            </th>
+                                                            <th data-priority="2"
+                                                                className="px-6 py-3 w-3/12">Org Unit
+                                                            </th>
+                                                            <th className="w-2/12"></th>
+                                                        </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                        {pagedParticipants.map((entity, index) => {
+                                                            return <>
+                                                                <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                                                                    <td>{index + 1}</td>
+                                                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
+                                                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
+                                                                    <td>
+                                                                        <button type="button"
+                                                                                className="warn-btn"
+                                                                                onClick={() => {
+                                                                                    removeParticipant(entity)
+                                                                                }}>Remove
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            </>
+                                                        })}
+                                                        </tbody>
+                                                        <tfoot>
+                                                        <tr>
+                                                            <th className="w-full p-2" colSpan={4}>
+                                                                <div
+                                                                    className="flex flex-row w-full justify-end">
+                                                                    <Pagination
+                                                                        page={participantsPage}
+                                                                        pageSize={participantPageSize}
+                                                                        pageCount={Math.ceil(participants.length / participantPageSize)}
+                                                                        total={participants.length}
+                                                                        onPageChange={(page) => pageParticipants(page)}
+                                                                        onPageSizeChange={(size) => {
+                                                                            setParticipantsPage(1);
+                                                                            setParticipantPageSize(size);
+                                                                            pageParticipants(1, size);
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </th>
+                                                        </tr>
+                                                        </tfoot>
+                                                    </table>
                                                 </div>
                                             </div>
                                         }

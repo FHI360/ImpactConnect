@@ -395,7 +395,7 @@ const ConfigurationComponent = () => {
                                     </label>
                                 </div>
                             </div>
-                            <div className="card mb-2">
+                            {/*<div className="card mb-2">
                                 <div className="w-3/12">
                                     <ProgramComponent
                                         selectedProgram={selectedProgram}
@@ -403,7 +403,7 @@ const ConfigurationComponent = () => {
                                         label={'Configure Program'}
                                     />
                                 </div>
-                            </div>
+                            </div>*/}
                             {selectedProgram &&
                                 <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
                                     <label htmlFor="program"

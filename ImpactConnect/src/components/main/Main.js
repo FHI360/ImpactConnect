@@ -11,14 +11,14 @@ import {
     isObjectEmpty,
     paginate,
     searchEntities,
-    sortEntities, trackerCreate
+    sortEntities,
+    trackerCreate
 } from '../../utils.js';
 import { DataElementComponent } from '../DataElement.js';
 import { Navigation } from '../Navigation.js';
 import { SearchComponent } from '../SearchComponent.js';
 import { SpinnerComponent } from '../SpinnerComponent.js';
 import { TrainingsComponent } from '../TrainingsComponent.js';
-import { VenueComponent } from '../VenueComponent.js';
 
 export const Main = () => {
     const engine = useDataEngine();
@@ -29,7 +29,6 @@ export const Main = () => {
     const [selectedTraining, setSelectedTraining] = useState('');
     const [stages, setStages] = useState([]);
     const [selectedStage, setSelectedStage] = useState('');
-    const [selectedVenue, setSelectedVenue] = useState('');
     const [orgUnits, setOrgUnits] = useState([]);
     const [startDate, setStateDate] = useState(new Date());
     const [endDate, setEndDate] = useState(null);
@@ -49,6 +48,7 @@ export const Main = () => {
     const [saving, setSaving] = useState(false);
     const [eventAttributes, setEventAttributes] = useState([]);
     const [scrollHeight, setScrollHeight] = useState('350px');
+    const [eventsLoading, setEventsLoading] = useState(false);
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -117,15 +117,18 @@ export const Main = () => {
     }, [elementsData]);
 
     useEffect(() => {
-        if (trainingProgram && selectedVenue) {
+        if (trainingProgram) {
+            setEventsLoading(true);
+
             engine.query({
                 trainings: {
                     resource: 'tracker/trackedEntities',
                     params: {
                         program: trainingProgram,
+                        ouMode: 'DESCENDANTS',
                         paging: false,
                         fields: 'attributes,trackedEntity',
-                        orgUnit: selectedVenue
+                        orgUnit: 'nLbABkQlwaT'
                     }
                 }
             }).then(res => {
@@ -143,10 +146,12 @@ export const Main = () => {
                     }));
                     setTrainings(Array.from(trainings));
                 }
+
+                setEventsLoading(false);
             })
         }
 
-    }, [trainingProgram, selectedVenue])
+    }, [trainingProgram])
 
     useEffect(() => {
         pageParticipants();
@@ -510,258 +515,236 @@ export const Main = () => {
                     <Navigation/>
                     <div className="p-6">
                         <div className="mx-auto w-full">
-                            <div className="w-full">
-                                <div className="w-full flex flex-row pt-2 gap-x-1">
-                                    <div
-                                        className={selectedVenue ? 'w-3/12 flex flex-col card gap-x-1' : 'w-full flex flex-col card gap-x-1'}>
-                                        <div className={!selectedVenue ? 'w-3/12 p-3' : 'w-10/12 p-3'}>
-                                            <label htmlFor="stage"
-                                                   className="label">
-                                                {i18n.t('Event Venue')}
-                                            </label>
-                                            <VenueComponent
-                                                venueSelected={(venue) => setSelectedVenue(venue)}
-                                            />
-                                            {!selectedVenue &&
-                                                <label className="label pl-2 pt-4 text-sm italic">
-                                                    Select a venue to begin configuring an event
-                                                </label>
+                            <div className="w-full flex flex-col">
+                                <div className="flex flex-col card w-full">
+                                    <>
+                                        <div className="w-full border-b-2 border-blue-500 p-2">
+                                            <TrainingsComponent trainings={trainings}
+                                                                program={trainingProgram}
+                                                                loading={eventsLoading}
+                                                                trainingSelected={(training) => setSelectedTraining(training)}/>
+                                        </div>
+                                        {entities.length > 0 &&
+                                            <div className="card p-2 pt-4">
+                                                <div
+                                                    className="flex items-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={groupEdit === true}
+                                                        onChange={(payload) => {
+                                                            setGroupEdit(payload.target.checked);
+                                                        }}
+                                                        className="checkbox"/>
+                                                    <label
+                                                        className="label pl-2 pt-2">
+                                                        {i18n.t('Group Action?')}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        }
+                                        <div className="flex flex-col w-full mb-2">
+                                            {groupEdit && entities.length > 0 &&
+                                                <div className="card">
+                                                    <div className="flex flex-col w-3/12 p-6">
+                                                        <label htmlFor="program"
+                                                               className="label pb-2">
+                                                            Attendance
+                                                        </label>
+                                                        {individualDataElementsForDates().map((id) => {
+                                                            const de = dataElements.find(e => e.id === id)
+                                                            return <>
+                                                                <div
+                                                                    className="flex flex-col my-auto pl-4">
+                                                                    <DataElementComponent
+                                                                        value={groupDataElementValue(de.id)}
+                                                                        dataElement={de}
+                                                                        readonly={selectedEntities.length === 0}
+                                                                        valueChanged={(d, v) => {
+                                                                            createOrUpdateGroupEvent(de, v)
+                                                                        }
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            </>
+                                                        })}
+                                                    </div>
+                                                </div>
                                             }
                                         </div>
-                                    </div>
-                                    {selectedVenue &&
-                                        <div className="flex flex-col card w-9/12">
-                                            <>
-                                                <div className="w-full border-b-2 border-blue-500 p-2">
-                                                    <TrainingsComponent trainings={trainings}
-                                                                        program={trainingProgram}
-                                                                        trainingSelected={(training) => setSelectedTraining(training)}/>
+                                    </>
+                                </div>
+                                <div className="w-full flex flex-col pt-2">
+                                    <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
+                                        <div
+                                            className={loading ? 'opacity-20 relative overflow-x-auto shadow-md sm:rounded-lg' : 'relative overflow-x-auto shadow-md sm:rounded-lg'}>
+                                            {loading &&
+                                                <SpinnerComponent/>
+                                            }
+                                            {entities.length > 0 &&
+                                                <div className="w-3/12">
+                                                    <SearchComponent search={(value) => search(value)}/>
                                                 </div>
-                                                {entities.length > 0 &&
-                                                    <div className="card p-2 pt-4">
-                                                        <div
-                                                            className="flex items-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={groupEdit === true}
-                                                                onChange={(payload) => {
-                                                                    setGroupEdit(payload.target.checked);
-                                                                }}
-                                                                className="checkbox"/>
-                                                            <label
-                                                                className="label pl-2 pt-2">
-                                                                {i18n.t('Group Action?')}
-                                                            </label>
-                                                        </div>
+                                            }
+                                            <table
+                                                className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                                <caption
+                                                    className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
+                                                    <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+
+                                                    </p>
+                                                    <div className="flex flex-row justify-end">
+                                                        {((groupEdit && !isObjectEmpty(groupValues) && selectedEntities.length > 0) || (!groupEdit && edits.length > 0)) &&
+                                                            <button type="button"
+                                                                    className={loading || saving ? 'primary-btn-disabled' : 'primary-btn'}
+                                                                    onClick={saveEdits}>
+                                                                <div
+                                                                    className="flex flex-row">
+                                                                    {(saving || loading) &&
+                                                                        <div
+                                                                            className="pr-2">
+                                                                            <SpinnerComponent/>
+                                                                        </div>
+                                                                    }
+                                                                    <span> Save Attendance</span>
+                                                                </div>
+                                                            </button>
+                                                        }
                                                     </div>
+                                                </caption>
+                                                <thead
+                                                    className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                {!groupEdit && entities.length > 0 &&
+                                                    <tr>
+                                                        <td colSpan={groupEdit ? 4 : 3}
+                                                            rowSpan={1}></td>
+                                                        {individualDataElementsForDates().map((id, idx) => {
+                                                            const de = dataElements.find(e => e.id === id)
+                                                            return <th key={idx}
+                                                                       rowSpan={5}
+                                                                       style={{width: `${41.66 / daysBetween(startDate, endDate)}%`}}
+                                                                       className="py-3 h-48">
+                                                                        <span
+                                                                            className="whitespace-nowrap block text-left -rotate-90 w-16 pb-4">{de?.name}</span>
+                                                            </th>
+                                                        })}
+                                                    </tr>
                                                 }
-                                                <div className="flex flex-col w-full mb-2">
-                                                    {groupEdit && entities.length > 0 &&
-                                                        <div className="card">
-                                                            <div className="flex flex-col w-3/12 p-6">
-                                                                <label htmlFor="program"
-                                                                       className="label pb-2">
-                                                                    Attendance
-                                                                </label>
-                                                                {individualDataElementsForDates().map((id) => {
-                                                                    const de = dataElements.find(e => e.id === id)
-                                                                    return <>
+                                                <tr>
+                                                    {groupEdit &&
+                                                        <th className="px-6 py-6 w-1/12">
+                                                            <div
+                                                                className="flex items-center mb-4">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    onChange={(event) => {
+                                                                        if (event.target.checked) {
+                                                                            setSelectedEntities(entities)
+                                                                        } else {
+                                                                            setSelectedEntities([])
+                                                                            setEdits([])
+                                                                        }
+                                                                    }}
+                                                                    checked={selectedEntities.length === entities.length}
+                                                                    className="checkbox"/>
+                                                            </div>
+                                                        </th>
+                                                    }
+                                                    <th data-priority="1" className="px-6 py-3 w-1/12">#
+                                                    </th>
+                                                    <th data-priority="2"
+                                                        className="px-6 py-3 w-3/12">Profile
+                                                    </th>
+                                                    <th data-priority="2"
+                                                        className="px-6 py-3 w-2/12">Org Unit
+                                                    </th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                {pagedParticipants.map((entity, index) => {
+                                                    return <>
+                                                        <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                                                            {groupEdit &&
+                                                                <td className="px-6 py-6">
+                                                                    <div
+                                                                        className="flex items-center mb-4">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)}
+                                                                            onChange={() => {
+                                                                                if (selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)) {
+                                                                                    setSelectedEntities(selectedEntities.filter(rowId => rowId.trackedEntity !== entity.trackedEntity));
+                                                                                    //setEdits(edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity))
+                                                                                } else {
+                                                                                    setSelectedEntities([...selectedEntities, entity]);
+
+                                                                                    /*let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
+                                                                                    if (!currentEdit) {
+                                                                                        currentEdit = {
+                                                                                            entity
+                                                                                        };
+                                                                                    }
+                                                                                    const sample = edits[0];
+                                                                                    if (sample) {
+                                                                                        currentEdit.values = sample.values;
+
+                                                                                        setEdits([...edits, currentEdit]);
+                                                                                    }*/
+                                                                                }
+                                                                            }}
+                                                                            className="checkbox"/>
+                                                                    </div>
+                                                                </td>
+                                                            }
+                                                            <td>{index + 1}</td>
+                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
+                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
+                                                            {!groupEdit && entities.length > 0 && dataElements.length > 0 && individualDataElementsForDates().map((cde, idx2) => {
+                                                                const de = dataElements.find(de => de.id === cde);
+                                                                return <>
+                                                                    <td>
                                                                         <div
                                                                             className="flex flex-col my-auto pl-4">
                                                                             <DataElementComponent
-                                                                                value={groupDataElementValue(de.id)}
+                                                                                key={idx2}
+                                                                                value={dataElementValue(startDate, de.id, entity)}
                                                                                 dataElement={de}
-                                                                                readonly={selectedEntities.length === 0}
+                                                                                labelVisible={false}
                                                                                 valueChanged={(d, v) => {
-                                                                                    createOrUpdateGroupEvent(de, v)
-                                                                                }
-                                                                                }
-                                                                            />
-                                                                        </div>
-                                                                    </>
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                </div>
-                                            </>
-                                        </div>
-                                    }
-                                </div>
-                                {selectedVenue &&
-                                    <div className="w-full flex flex-col pt-2">
-                                        <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
-                                            <div
-                                                className={loading ? 'opacity-20 relative overflow-x-auto shadow-md sm:rounded-lg' : 'relative overflow-x-auto shadow-md sm:rounded-lg'}>
-                                                {loading &&
-                                                    <SpinnerComponent/>
-                                                }
-                                                {entities.length > 0 &&
-                                                    <div className="w-3/12">
-                                                        <SearchComponent search={(value) => search(value)}/>
-                                                    </div>
-                                                }
-                                                <table
-                                                    className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                                                    <caption
-                                                        className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
-                                                        <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
-
-                                                        </p>
-                                                        <div className="flex flex-row justify-end">
-                                                            {((groupEdit && !isObjectEmpty(groupValues) && selectedEntities.length > 0) || (!groupEdit && edits.length > 0)) &&
-                                                                <button type="button"
-                                                                        className={loading || saving ? 'primary-btn-disabled' : 'primary-btn'}
-                                                                        onClick={saveEdits}>
-                                                                    <div
-                                                                        className="flex flex-row">
-                                                                        {(saving || loading) &&
-                                                                            <div
-                                                                                className="pr-2">
-                                                                                <SpinnerComponent/>
-                                                                            </div>
-                                                                        }
-                                                                        <span> Save Attendance</span>
-                                                                    </div>
-                                                                </button>
-                                                            }
-                                                        </div>
-                                                    </caption>
-                                                    <thead
-                                                        className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                                    {!groupEdit && entities.length > 0 &&
-                                                        <tr>
-                                                            <td colSpan={groupEdit ? 4 : 3}
-                                                                rowSpan={1}></td>
-                                                            {individualDataElementsForDates().map((id, idx) => {
-                                                                const de = dataElements.find(e => e.id === id)
-                                                                return <th key={idx}
-                                                                           rowSpan={5}
-                                                                           style={{width: `${41.66 / daysBetween(startDate, endDate)}%`}}
-                                                                           className="py-3 h-48">
-                                                                        <span
-                                                                            className="whitespace-nowrap block text-left -rotate-90 w-16 pb-4">{de?.name}</span>
-                                                                </th>
-                                                            })}
-                                                        </tr>
-                                                    }
-                                                    <tr>
-                                                        {groupEdit &&
-                                                            <th className="px-6 py-6 w-1/12">
-                                                                <div
-                                                                    className="flex items-center mb-4">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        onChange={(event) => {
-                                                                            if (event.target.checked) {
-                                                                                setSelectedEntities(entities)
-                                                                            } else {
-                                                                                setSelectedEntities([])
-                                                                                setEdits([])
-                                                                            }
-                                                                        }}
-                                                                        checked={selectedEntities.length === entities.length}
-                                                                        className="checkbox"/>
-                                                                </div>
-                                                            </th>
-                                                        }
-                                                        <th data-priority="1" className="px-6 py-3 w-1/12">#
-                                                        </th>
-                                                        <th data-priority="2"
-                                                            className="px-6 py-3 w-3/12">Profile
-                                                        </th>
-                                                        <th data-priority="2"
-                                                            className="px-6 py-3 w-2/12">Org Unit
-                                                        </th>
-                                                    </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                    {pagedParticipants.map((entity, index) => {
-                                                        return <>
-                                                            <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
-                                                                {groupEdit &&
-                                                                    <td className="px-6 py-6">
-                                                                        <div
-                                                                            className="flex items-center mb-4">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)}
-                                                                                onChange={() => {
-                                                                                    if (selectedEntities.map(e => e.trackedEntity).includes(entity.trackedEntity)) {
-                                                                                        setSelectedEntities(selectedEntities.filter(rowId => rowId.trackedEntity !== entity.trackedEntity));
-                                                                                        //setEdits(edits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity))
-                                                                                    } else {
-                                                                                        setSelectedEntities([...selectedEntities, entity]);
-
-                                                                                        /*let currentEdit = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
-                                                                                        if (!currentEdit) {
-                                                                                            currentEdit = {
-                                                                                                entity
-                                                                                            };
-                                                                                        }
-                                                                                        const sample = edits[0];
-                                                                                        if (sample) {
-                                                                                            currentEdit.values = sample.values;
-
-                                                                                            setEdits([...edits, currentEdit]);
-                                                                                        }*/
-                                                                                    }
-                                                                                }}
-                                                                                className="checkbox"/>
+                                                                                    createOrUpdateIndividualEvent(entity, de, v)
+                                                                                }}/>
                                                                         </div>
                                                                     </td>
-                                                                }
-                                                                <td>{index + 1}</td>
-                                                                <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
-                                                                <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
-                                                                {!groupEdit && entities.length > 0 && dataElements.length > 0 && individualDataElementsForDates().map((cde, idx2) => {
-                                                                    const de = dataElements.find(de => de.id === cde);
-                                                                    return <>
-                                                                        <td>
-                                                                            <div
-                                                                                className="flex flex-col my-auto pl-4">
-                                                                                <DataElementComponent
-                                                                                    key={idx2}
-                                                                                    value={dataElementValue(startDate, de.id, entity)}
-                                                                                    dataElement={de}
-                                                                                    labelVisible={false}
-                                                                                    valueChanged={(d, v) => {
-                                                                                        createOrUpdateIndividualEvent(entity, de, v)
-                                                                                    }}/>
-                                                                            </div>
-                                                                        </td>
-                                                                    </>
-                                                                })}
-                                                            </tr>
-                                                        </>
-                                                    })}
-                                                    </tbody>
-                                                    <tfoot>
-                                                    <tr>
-                                                        <th className="w-full p-2"
-                                                            colSpan={!groupEdit ? daysBetween(startDate, endDate) + 4 : 4}>
-                                                            <div
-                                                                className="flex flex-row w-full justify-end">
-                                                                <Pagination
-                                                                    page={page}
-                                                                    pageCount={Math.ceil(entities.length / pageSize)}
-                                                                    pageSize={pageSize}
-                                                                    total={entities.length}
-                                                                    onPageChange={(page) => setPage(page)}
-                                                                    onPageSizeChange={(size) => {
-                                                                        setPage(1);
-                                                                        setPageSize(size);
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        </th>
-                                                    </tr>
-                                                    </tfoot>
-                                                </table>
-                                            </div>
+                                                                </>
+                                                            })}
+                                                        </tr>
+                                                    </>
+                                                })}
+                                                </tbody>
+                                                <tfoot>
+                                                <tr>
+                                                    <th className="w-full p-2"
+                                                        colSpan={!groupEdit ? daysBetween(startDate, endDate) + 4 : 4}>
+                                                        <div
+                                                            className="flex flex-row w-full justify-end">
+                                                            <Pagination
+                                                                page={page}
+                                                                pageCount={Math.ceil(entities.length / pageSize)}
+                                                                pageSize={pageSize}
+                                                                total={entities.length}
+                                                                onPageChange={(page) => setPage(page)}
+                                                                onPageSizeChange={(size) => {
+                                                                    setPage(1);
+                                                                    setPageSize(size);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </th>
+                                                </tr>
+                                                </tfoot>
+                                            </table>
                                         </div>
                                     </div>
-                                }
+                                </div>
                             </div>
                         </div>
                     </div>
