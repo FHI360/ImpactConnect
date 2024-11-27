@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import React, { useEffect, useState } from 'react';
 import { DataElementComponent } from './DataElement.js';
 
-export const TrainingsComponent = ({program, trainings, trainingSelected}) => {
+export const TrainingsComponent = ({program, trainings, trainingSelected, loading}) => {
     const engine = useDataEngine();
     const [selectedTraining, setSelectedTraining] = useState('');
     const [collapsed, setCollapsed] = useState(false);
@@ -53,15 +53,21 @@ export const TrainingsComponent = ({program, trainings, trainingSelected}) => {
                         setSelectedTraining(event.target.value);
                         trainingSelected(event.target.value);
                     }}>
-                    <option
-                        selected>Select training
-                    </option>
-                    {trainings.map(option => {
-                            return <>
-                                <option
-                                    value={option.id}>{option.label}</option>
-                            </>
-                        }
+                    {loading ? (
+                        <option>Loading...</option>
+                    ) : (
+                        <>
+                            <option
+                                selected>Select training
+                            </option>
+                            {trainings.map(option => {
+                                    return <>
+                                        <option
+                                            value={option.id}>{option.label}</option>
+                                    </>
+                                }
+                            )}
+                        </>
                     )}
                 </select>
             </div>
@@ -125,6 +131,7 @@ export const TrainingsComponent = ({program, trainings, trainingSelected}) => {
 }
 
 TrainingsComponent.propTypes = {
+    loading: PropTypes.bool,
     program: PropTypes.string,
     trainingSelected: PropTypes.func,
     trainings: PropTypes.array
