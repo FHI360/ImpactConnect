@@ -286,6 +286,7 @@ export const trackerCreate = async (engine, data) => {
             return false;
         }
     } catch (e) {
+        console.log('Tracker error', e)
         return false;
     }
 
@@ -486,4 +487,9 @@ export const daysBetween = (startDate, endDate) => {
     } else {
         return 1;
     }
+}
+
+export const getAttribute = (entity, attribute)=> {
+    const attributes = entity.enrollments && entity.enrollments.length > 0 && entity.enrollments[0].attributes || entity.attributes;
+    return attributes.find(attr => attr.attribute === attribute)?.value
 }

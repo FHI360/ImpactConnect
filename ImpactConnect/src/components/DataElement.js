@@ -218,13 +218,16 @@ export const DataElementComponent = ({
                             </select>
                             {!edit && !readonly && optionAdd &&
                                 <>
-                                    {(!value || value === 'Select one') &&
-                                        <div className="p-2" onClick={() => {
-                                            setEdit(true);
-                                            setSelectedValue('');
-                                            setRenameMode(false);
-                                        }}>+</div>
-                                    }
+                                    <div className="p-1" onClick={() => {
+                                        setEdit(true);
+                                        setSelectedValue('');
+                                        setRenameMode(false);
+                                    }}>
+                                        <button type="button"
+                                                className="primary-btn">
+                                            Add
+                                        </button>
+                                    </div>
                                     {value && value !== 'Select one' &&
                                         <div className="p-2" onClick={() => {
                                             setEdit(true);
