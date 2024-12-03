@@ -766,6 +766,9 @@ video {
 .fill-blue-600 {
   fill: #2563eb;
 }
+.p-1 {
+  padding: 0.25rem;
+}
 .p-2 {
   padding: 0.5rem;
 }
@@ -786,9 +789,6 @@ video {
 }
 .p-8 {
   padding: 2rem;
-}
-.p-1 {
-  padding: 0.25rem;
 }
 .px-6 {
   padding-left: 1.5rem;

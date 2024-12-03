@@ -321,6 +321,20 @@ export const EventsComponent = () => {
 
     const saveTraining = async () => {
         setSaving(true);
+
+        let type = entityType;
+        if (!type || type.length === 0) {
+            const programData = await engine.query( {
+                programs: {
+                    resource: `programs`,
+                    params: {
+                        fields: 'id, trackedEntityType(id)',
+                        paging: false
+                    }
+                }
+            });
+           type = programData.programs.programs.find(p => p.id === trainingProgram)?.trackedEntityType.id;
+        }
         const attributes = trainingAttributes.map(attr => {
             const valueType = trainingAttributesData.find(ta => ta.id === attr).valueType;
             let value = groupDataElementValue(attr);
@@ -351,7 +365,7 @@ export const EventsComponent = () => {
         });
         let entity = {
             orgUnit: selectedVenue,
-            trackedEntityType: entityType,
+            trackedEntityType: type,
             trackedEntity: selectedTraining,
             attributes: attributes,
             enrollments: [
@@ -465,28 +479,31 @@ export const EventsComponent = () => {
     }
 
     const validateTraining = () => {
-        return Object.keys(groupValues).length > 0 && Object.keys(groupValues).every(key => {
-            const valueType = trainingAttributesData.find(ta => ta.id === key).valueType;
+        return trainingAttributesData.every(ta => {
+            const valueType = ta.valueType;
+            if (ta.id === 'oIZRuzzHXxa' || ta.id === 'rlCta8FG2fz') {
+                return true;
+            }
             if (valueType === 'TRUE_ONLY' || valueType === 'BOOLEAN') {
                 return true;
             }
             if (valueType === 'INTEGER' || valueType === 'NUMBER') {
-                const value = parseInt(groupValues[key]);
+                const value = parseInt(groupValues[ta.id]);
                 return value === 0 || !!value;
             }
             if (valueType === 'INTEGER_ZERO_OR_POSITIVE') {
-                const value = parseInt(groupValues[key]);
+                const value = parseInt(groupValues[ta.id]);
                 return value >= 0;
             }
             if (valueType === 'INTEGER_NEGATIVE') {
-                const value = parseInt(groupValues[key]);
+                const value = parseInt(groupValues[ta.id]);
                 return value < 0;
             }
             if (valueType === 'INTEGER_POSITIVE') {
-                const value = parseInt(groupValues[key]);
+                const value = parseInt(groupValues[ta.id]);
                 return value > 0;
             }
-            return !!groupValues[key] && groupValues[key] !== 'Select one';
+            return !!groupValues[ta.id] && groupValues[ta.id] !== 'Select one';
         });
     }
 

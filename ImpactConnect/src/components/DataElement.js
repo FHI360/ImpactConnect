@@ -208,7 +208,7 @@ export const DataElementComponent = ({
                                 ) : (
                                     <>
                                         <option defaultValue={null}>Select one</option>
-                                        {options.filter(option => !!option).map(option => (
+                                        {options.filter(o => !!o).sort((n1, n2) => n1.displayName.localeCompare(n2.displayName)).filter(option => !!option).map(option => (
                                             <option key={option.code} value={option.code}>
                                                 {option.displayName}
                                             </option>
