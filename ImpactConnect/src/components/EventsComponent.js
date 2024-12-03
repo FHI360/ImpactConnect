@@ -1,8 +1,8 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+/*import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';*/
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { config, EVENT_OPTIONS, REPORT } from '../consts.js';
 import {
@@ -517,7 +517,7 @@ export const EventsComponent = () => {
     }
 
     const downloadAttendance = async () => {
-        const workbook = new ExcelJS.Workbook();
+        /*const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Attendance',
             {
                 headerFooter: {
@@ -551,7 +551,7 @@ export const EventsComponent = () => {
         const buffer = await workbook.xlsx.writeBuffer();
 
         // Save the Excel file
-        saveAs(new Blob([buffer]), 'Attendance.xlsx');
+        saveAs(new Blob([buffer]), 'Attendance.xlsx');*/
     }
 
     return (
