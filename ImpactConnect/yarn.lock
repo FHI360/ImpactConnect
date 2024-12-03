@@ -12853,7 +12853,7 @@ tunnel-agent@^0.6.0:
     safe-buffer "^5.0.1"
 
 "Tunozegusoma-Impact-Connect@file:":
-  version "Test1.0.0"
+  version "1.0.0-test"
   resolved "file:"
   dependencies:
     "@dhis2/app-runtime" "^3.10.6"

@@ -6,7 +6,5 @@ build/app
 /i18n
 /.idea
 package.json
-<<<<<<< HEAD
 yarn.lock
-=======
->>>>>>> b1ac4e4c9b7c5b71b4634289c6438765cc0a27a2
+package-lock.json
