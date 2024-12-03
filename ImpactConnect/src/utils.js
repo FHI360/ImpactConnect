@@ -1,10 +1,10 @@
-import React, { createContext, useState, useCallback } from 'react';
+import React, { createContext, useCallback, useState } from 'react';
 import classes from './App.module.css'
+import { config } from './consts.js';
 import refresh from './icons/refresh.png'
 import search from './icons/search.png'
 
 export const customImage = (source, size = 'small') => {
-
     // Check the source and set iconClass accordingly
     let iconClass = '';
     iconClass = size === 'small' ? classes.smallIcon : size === 'large' ? classes.largeIcon : classes.smallIcon;
@@ -14,11 +14,9 @@ export const customImage = (source, size = 'small') => {
     if (source.toLowerCase() === 'refresh') {
         return <img src={refresh} className={iconClass}/>
     }
-
 }
 
 export const createOrUpdateDataStore = async (engine, postObject, store, key, mode = '') => {
-
     if (!postObject.hasOwnProperty('modifiedDate')) {
         // If it doesn't exist, add it to the object
         postObject.modifiedDate = modifiedDate();
@@ -42,18 +40,15 @@ export const createOrUpdateDataStore = async (engine, postObject, store, key, mo
     }
 
     try {
-
         const result = await engine.mutate({
             resource: `dataStore/${store}/${key}`,
             type: modeType ? 'create' : 'update',
             data: postObject,
         });
-        // console.log('Mutation successful:', result);
         return result;
     } catch (error) {
         console.error('Error creating or updating object:', error);
         // throw error;
-
     }
 }
 
@@ -258,20 +253,44 @@ export const removeDuplicates = (inputString) => {
     return uniqueArray.join(';');
 };
 
-
-export const delete_tei = async (engine, tei) => {
-
+export const trackerDelete = async (engine, data) => {
     try {
-        const response = await engine.mutate({
-            resource: `trackedEntityInstances/${tei}`,
-            type: 'delete',
+        await engine.mutate({
+            resource: `tracker`,
+            type: 'create',
+            params: {
+                async: false,
+                importStrategy: 'delete'
+            },
+            data
         });
         return true
     } catch (error) {
         return false
     }
+}
+
+export const trackerCreate = async (engine, data) => {
+    try {
+        const response = await engine.mutate({
+            resource: 'tracker',
+            type: 'create',
+            params: {
+                async: false
+            },
+            data
+        });
+        if (response.status === 'OK') {
+            return response.bundleReport.typeReportMap;
+        } else {
+            return false;
+        }
+    } catch (e) {
+        return false;
+    }
 
 }
+
 export const generateRandomId = () => {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const idLength = 11;
@@ -377,3 +396,94 @@ export const useSharedState = () => {
     }
 }
 
+export const paginate = (array, pageNumber, pageSize) => {
+    const startIndex = (pageNumber - 1) * pageSize;
+    return array.slice(startIndex, startIndex + pageSize);
+}
+
+export const dataStoreQuery = {
+    dataStore: {
+        resource: `dataStore/${config.dataStoreName}?fields=.`,
+    }
+};
+
+export const getParticipant = (entity, nameAttributes) => {
+    return nameAttributes.map(attr => {
+        const attributes = entity.enrollments && entity.enrollments.length > 0 && entity.enrollments[0].attributes || entity.attributes;
+        return attributes?.find(attribute => attribute.attribute === attr)?.value
+    }).join(' ')
+}
+
+export const formatDate = (date) => {
+    if (!date) {
+        return null;
+    }
+    return new Intl.DateTimeFormat('en-GB', {
+        dateStyle: 'medium',
+    }).format(new Date(date));
+}
+
+export const fetchEntities = (engine, ids, fields) => {
+    const fetchEntity = (id) => {
+        return engine.query({
+            entity: {
+                resource: 'tracker/trackedEntities',
+                id,
+                params: {
+                    fields,
+                }
+            }
+        })
+    }
+    const requests = ids.map(id => fetchEntity(id));
+    return Promise.all(requests);
+}
+
+export const isObjectEmpty = (objectName) => {
+    return Object.keys(objectName).length === 0
+}
+
+export const sortEntities = (entities, nameAttributes = []) => {
+    return entities.sort((e1, e2) => {
+        const attributes1 = e1.enrollments && e1.enrollments.length > 0 && e1.enrollments[0].attributes || e1.attributes;
+        const attributes2 = e2.enrollments && e2.enrollments.length > 0 && e2.enrollments[0].attributes || e2.attributes;
+
+        for (let i = 0; i < nameAttributes.length; i++) {
+            const attribute = nameAttributes[i];
+            const attribute1 = attributes1.find(attr => attr.attribute === attribute)?.value ?? '';
+            const attribute2 = attributes2.find(attr => attr.attribute === attribute)?.value ?? '';
+
+            const compare = attribute1.localeCompare(attribute2);
+            if (compare !== 0) {
+                return compare;
+            }
+        }
+
+        return 0;
+    })
+}
+
+export const searchEntities = (keyword = '', entities, nameAttributes = []) => {
+    return entities.filter(entity => {
+        const attributes = entity.enrollments && entity.enrollments.length > 0 && entity.enrollments[0].attributes || entity.attributes;
+        const names = attributes.filter(attr => nameAttributes.includes(attr.attribute))
+            .map(attr => attr.value);
+
+        return names.some(name => name.toLowerCase().includes((keyword ?? '').toLowerCase()))
+    })
+}
+
+export const daysBetween = (startDate, endDate) => {
+    if (endDate) {
+        const dates = [];
+        const currentDate = new Date(startDate);
+
+        while (currentDate <= endDate) {
+            dates.push(new Date(currentDate));
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        return dates.length;
+    } else {
+        return 1;
+    }
+}

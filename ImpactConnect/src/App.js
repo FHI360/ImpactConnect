@@ -1,6 +1,7 @@
 import React from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import ConfigurationComponent from './components/ConfigurationComponent.js';
+import { EventsComponent } from './components/EventsComponent.js';
 import { Main } from './components/main/Main.js';
 import { footerText } from './consts.js';
 import SetupStateProvider from './SetupStateProvider.js';
@@ -23,13 +24,20 @@ const MyApp = () => (
                             path="/configure"
                             element={<ConfigurationComponent/>}
                         />
+                        <Route
+                            configure
+                            exact
+                            path="/events"
+                            element={<EventsComponent/>}
+                        />
                         {/* defaulting if unmatched */}
                         <Route path="*" element={<Navigate to="/" replace/>}/>
                     </Routes>
                 </div>
 
                 <footer>
-                    <div className="flex items-center">
+                    <div className="flex flex-col items-center">
+                        {/*{customImage('logo')}*/}
                         <p className="mx-auto font-semibold">{footerText}</p>
                     </div>
                 </footer>
