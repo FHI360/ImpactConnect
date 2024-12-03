@@ -123,3 +123,9 @@ export const EVENT_OPTIONS = {
         }
     ]
 }
+
+export const REPORT = {
+    PHONE: 'ls0TZ2qIQY4',
+    GENDER: 'RFDW6SognD1',
+    POSITION: 'oRJhK50Ttid'
+}
