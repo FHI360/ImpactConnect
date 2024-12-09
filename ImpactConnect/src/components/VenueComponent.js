@@ -79,7 +79,7 @@ export const VenueComponent = ({
                     ) : (
                         <>
                             <option defaultValue={''}>Select Province</option>
-                            {level2OrgUnits.map(option => (
+                            {level2OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
                                 <option key={option.id} value={option.id}>
                                     {option.displayName}
                                 </option>
@@ -105,7 +105,7 @@ export const VenueComponent = ({
                         ) : (
                             <>
                                 <option defaultValue={''}>Select District</option>
-                                {level3OrgUnits.map(option => (
+                                {level3OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
                                     <option key={option.id} value={option.id}>
                                         {option.displayName}
                                     </option>
@@ -131,7 +131,7 @@ export const VenueComponent = ({
                         ) : (
                             <>
                                 <option defaultValue={''}>Select Sector</option>
-                                {level4OrgUnits.map(option => (
+                                {level4OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
                                     <option key={option.id} value={option.id}>
                                         {option.displayName}
                                     </option>
@@ -155,7 +155,7 @@ export const VenueComponent = ({
                         ) : (
                             <>
                                 <option defaultValue={''}>Select Venue</option>
-                                {level5OrgUnits.map(option => (
+                                {level5OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
                                     <option key={option.id} value={option.id}>
                                         {option.displayName}
                                     </option>

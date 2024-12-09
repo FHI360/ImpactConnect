@@ -10,9 +10,9 @@ export const DataElementSortComponent=({checkDataElements, dataElements, moveDat
                 <div
                     className="relative overflow-x-auto shadow-md sm:rounded-lg">
                     <table
-                        className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                        className="w-full text-sm text-left rtl:text-right text-gray-500 ">
                         <thead
-                            className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            className="text-xs text-gray-700 uppercase bg-gray-50 ">
                         <tr>
                             <th data-priority="1" className="px-6 py-3 w-1/12">#</th>
                             <th data-priority="2" className="px-6 py-3 w-9/12 text-left">
@@ -26,7 +26,7 @@ export const DataElementSortComponent=({checkDataElements, dataElements, moveDat
                             return <>
                                 <tr>
                                     <td>{index + 1}</td>
-                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{dataElements.find(de => de.id === dataElement)?.name}</td>
+                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{dataElements.find(de => de.id === dataElement)?.name}</td>
                                     <td>
                                         <div className="flex flex-row">
                                             {index < ((checkDataElements || []).length - 1) &&
@@ -51,7 +51,7 @@ export const DataElementSortComponent=({checkDataElements, dataElements, moveDat
                         })}
                         </tbody>
                         <tfoot>
-                        <tr className="font-semibold text-gray-900 dark:text-white">
+                        <tr className="font-semibold text-gray-900 ">
                             <th colSpan={2} className="px-6 py-3 text-base">
                                 <button type="button"
                                         className="primary-btn"
