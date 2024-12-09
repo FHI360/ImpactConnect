@@ -3,7 +3,7 @@ import React from 'react';
 import { DataElementComponent } from './DataElement.js';
 
 export const DataElementsComponent = React.memo(({
-                                                     data, valueChange
+                                                     data, valueChange, setEditingOption, disable
                                                  }) => {
     return (
         <>
@@ -16,6 +16,8 @@ export const DataElementsComponent = React.memo(({
                                                   value={data.groupValues[cde]}
                                                   dataElement={de}
                                                   labelVisible={true}
+                                                  setEditingOption={setEditingOption}
+                                                  readonly={disable}
                                                   valueChanged={valueChange}/>
                         </div>
                     </>
@@ -27,5 +29,7 @@ export const DataElementsComponent = React.memo(({
 
 DataElementsComponent.propTypes = {
     data: PropTypes.object,
+    disable: PropTypes.bool,
+    setEditingOption: PropTypes.func,
     valueChange: PropTypes.func,
 };

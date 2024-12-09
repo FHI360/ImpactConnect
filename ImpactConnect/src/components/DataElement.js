@@ -10,9 +10,12 @@ export const DataElementComponent = ({
                                          labelVisible = true,
                                          label,
                                          value,
+                                         required,
                                          valueChanged,
                                          readonly,
-                                         optionAdd = true
+                                         optionAdd = false,
+                                         setEditingOption = (_) => {
+                                         }
                                      }) => {
     const engine = useDataEngine();
 
@@ -65,6 +68,10 @@ export const DataElementComponent = ({
             });
         }
     }, [memorizedOptionSetId]);
+
+    if (dataElement?.id === 'CJ7g6K9Ukvf') {
+        optionAdd = true;
+    }
 
     const renameOption = () => {
         const option = options.find(opt => opt.code === selectedValue);
@@ -184,6 +191,13 @@ export const DataElementComponent = ({
         return true;
     };
 
+    const toBoolean = (value) => {
+        if (typeof value === 'string') {
+            return value.toLowerCase() === 'true';
+        }
+        return !!value;
+    }
+
     return (
         <>
             <div>
@@ -191,13 +205,13 @@ export const DataElementComponent = ({
                     <div className="flex flex-col">
                         {labelVisible &&
                             <label className="label">
-                                {label || dataElement.name || dataElement.displayName}
+                                {label || dataElement.name || dataElement.displayName} {dataElement?.id === 'CJ7g6K9Ukvf' && <span className="required">*</span>}
                             </label>
                         }
                         <div className="flex flex-row">
                             <select className="select"
                                     value={value ?? optionValue ?? ''}
-                                    disabled={readonly}
+                                    disabled={readonly && !edit}
                                     onChange={(event) => {
                                         setEdit(false);
                                         valueChanged(dataElement, event.target.value);
@@ -222,6 +236,7 @@ export const DataElementComponent = ({
                                         setEdit(true);
                                         setSelectedValue('');
                                         setRenameMode(false);
+                                        setEditingOption(true)
                                     }}>
                                         <button type="button"
                                                 className="primary-btn">
@@ -231,6 +246,7 @@ export const DataElementComponent = ({
                                     {value && value !== 'Select one' &&
                                         <div className="p-2" onClick={() => {
                                             setEdit(true);
+                                            setEditingOption(true)
                                             setRenameMode(true);
                                             const option = options.find(opt => opt.code === selectedValue);
                                             setOptionLabel(option?.displayName)
@@ -268,7 +284,10 @@ export const DataElementComponent = ({
                                         className="text-input"/>
                                 </div>
                                 {optionLabel &&
-                                    <button type="button" onClick={renameMode ? renameOption : addOption}
+                                    <button type="button" onClick={() => {
+                                        renameMode ? renameOption() : addOption();
+                                        setEditingOption(false);
+                                    }}
                                             disabled={loading}
                                             className={loading ? 'primary-btn-disabled' : 'primary-btn'}>
                                         <div
@@ -283,7 +302,11 @@ export const DataElementComponent = ({
                                         </div>
                                     </button>
                                 }
-                                <button type="button" onClick={() => setEdit(false)} className="default-btn">
+                                <button type="button" onClick={() => {
+                                    setEdit(false);
+                                    setEditingOption(false)
+                                }}
+                                        className="default-btn">
                                     Cancel
                                 </button>
                             </div>
@@ -297,12 +320,12 @@ export const DataElementComponent = ({
                                 <input
                                     type="checkbox"
                                     disabled={readonly}
-                                    checked={value === true || value === 'true'}
+                                    checked={toBoolean(value)}
                                     onChange={(event) => valueChanged(dataElement, event.target.checked)}
                                     className="checkbox"/>
                                 {labelVisible &&
                                     <label className="label pl-2 pt-2">
-                                        {label || dataElement.name || dataElement.displayName}
+                                        {label || dataElement.name || dataElement.displayName}{required && '*'}
                                     </label>
                                 }
                             </div>
@@ -332,7 +355,7 @@ export const DataElementComponent = ({
                             <div className="mb-5">
                                 {labelVisible &&
                                     <label className="text-left label">
-                                        {label || dataElement.name || dataElement.displayName}
+                                        {label || dataElement.name || dataElement.displayName}{required && '*'}
                                     </label>
                                 }
                                 <input
@@ -347,7 +370,7 @@ export const DataElementComponent = ({
                             <div className="mb-2 flex flex-col">
                                 {labelVisible &&
                                     <label className="text-left label">
-                                        {label || dataElement.name || dataElement.displayName}
+                                        {label || dataElement.name || dataElement.displayName}{required && '*'}
                                     </label>
                                 }
                                 <CalendarInput
@@ -372,6 +395,7 @@ DataElementComponent.propTypes = {
     labelVisible: PropTypes.bool,
     optionAdd: PropTypes.bool,
     readonly: PropTypes.bool,
+    setEditingOption: PropTypes.func,
     value: PropTypes.string,
     valueChanged: PropTypes.func
 };

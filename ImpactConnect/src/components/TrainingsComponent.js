@@ -60,7 +60,7 @@ export const TrainingsComponent = ({program, trainings, trainingSelected, loadin
                             <option
                                 selected>Select training
                             </option>
-                            {trainings.map(option => {
+                            {trainings.sort((t1, t2) => t1?.label?.localeCompare(t2?.label)).map(option => {
                                     return <>
                                         <option
                                             value={option.id}>{option.label}</option>
@@ -75,7 +75,7 @@ export const TrainingsComponent = ({program, trainings, trainingSelected, loadin
                 <div className="">
                     <h2 onClick={() => setCollapsed(!collapsed)}>
                         <button type="button"
-                                className="bg-white flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
+                                className="bg-white flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 hover:bg-gray-100 gap-3"
                                 data-accordion-target="#accordion-collapse-body-1" aria-expanded="true"
                                 aria-controls="accordion-collapse-body-1">
                             <span>{trainings.find(t => t.id === selectedTraining)?.label}</span>
@@ -99,7 +99,7 @@ export const TrainingsComponent = ({program, trainings, trainingSelected, loadin
                     </h2>
                     <div className={collapsed ? '' : 'hidden'}>
                         <div
-                            className="bg-white border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                            className="bg-white border border-b-0 border-gray-200 ">
                             {(attributes || []).length > 0 &&
                                 <div className="w-full flex flex-col pt-2">
                                     <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">

@@ -1,8 +1,8 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
-/*import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';*/
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { config, EVENT_OPTIONS, REPORT } from '../consts.js';
 import {
@@ -58,6 +58,9 @@ export const EventsComponent = () => {
     const [editMode, setEditMode] = useState(false);
     const [scrollHeight, setScrollHeight] = useState('350px');
     const [loadingEntities, setLoadingEntities] = useState(false);
+    const [disable, setDisable] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [toggle, setToggle] = useState(false);
 
     const memoizedData = useMemo(() => {
         return {
@@ -207,24 +210,7 @@ export const EventsComponent = () => {
 
     useEffect(() => {
         if (trainingProgram && selectedVenue) {
-            fetchEvents().then(eventData => {
-                if (eventData && eventData.events) {
-                    setEvents(eventData.events.instances);
-
-                    const trainings = new Set(eventData.events.instances.flatMap(i => {
-                        return i.attributes.map(attr => {
-                            attr['trackedEntity'] = i.trackedEntity;
-                            return attr;
-                        })
-                    }).filter(attr => attr.attribute === eventNameAttribute).map(attr => {
-                        return {
-                            id: attr.trackedEntity,
-                            label: attr.value
-                        }
-                    }));
-                    setTrainings(Array.from(trainings));
-                }
-            })
+            fetchEventAndTrainings()
         }
 
     }, [entityType, selectedVenue]);
@@ -242,7 +228,7 @@ export const EventsComponent = () => {
             setParticipants([]);
             const ids = training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
             if (ids.length > 0) {
-                fetchEntities(engine, ids, 'trackedEntity,orgUnit,attributes').then(value => {
+                fetchEntities(engine, ids, 'trackedEntity,orgUnit,attributes,relationships').then(value => {
                     const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
                     setParticipants(attendees);
                     setLoading(false);
@@ -260,7 +246,7 @@ export const EventsComponent = () => {
                 }
             });
         }
-    }, [selectedTraining]);
+    }, [selectedTraining, toggle]);
 
     useEffect(() => {
         const adjustScrollHeight = () => {
@@ -283,6 +269,27 @@ export const EventsComponent = () => {
             window.removeEventListener('resize', adjustScrollHeight);
         };
     }, []);
+
+    const fetchEventAndTrainings = () => {
+        fetchEvents().then(eventData => {
+            if (eventData && eventData.events) {
+                setEvents(eventData.events.instances);
+
+                const trainings = new Set(eventData.events.instances.flatMap(i => {
+                    return i.attributes.map(attr => {
+                        attr['trackedEntity'] = i.trackedEntity;
+                        return attr;
+                    })
+                }).filter(attr => attr.attribute === eventNameAttribute).map(attr => {
+                    return {
+                        id: attr.trackedEntity,
+                        label: attr.value
+                    }
+                }));
+                setTrainings(Array.from(trainings));
+            }
+        })
+    }
 
     const orgUnitChanged = event => {
         setOrgUnit(event.id);
@@ -320,11 +327,12 @@ export const EventsComponent = () => {
     }
 
     const saveTraining = async () => {
-        setSaving(true);
-
+        if (!validateTraining()) {
+            return true;
+        }
         let type = entityType;
         if (!type || type.length === 0) {
-            const programData = await engine.query( {
+            const programData = await engine.query({
                 programs: {
                     resource: `programs`,
                     params: {
@@ -333,7 +341,7 @@ export const EventsComponent = () => {
                     }
                 }
             });
-           type = programData.programs.programs.find(p => p.id === trainingProgram)?.trackedEntityType.id;
+            type = programData.programs.programs.find(p => p.id === trainingProgram)?.trackedEntityType.id;
         }
         const attributes = trainingAttributes.map(attr => {
             const valueType = trainingAttributesData.find(ta => ta.id === attr).valueType;
@@ -387,6 +395,8 @@ export const EventsComponent = () => {
             event.attributes = attributes;
             entity = event;
         }
+
+        setSaving(true);
         const response = await trackerCreate(engine, {
             trackedEntities: [entity]
         });
@@ -402,6 +412,13 @@ export const EventsComponent = () => {
                     setSaving(false);
                     setEntities([]);
                     setSelectedTraining('');
+                    fetchEvents().then(eventData => {
+                        if (eventData && eventData.events) {
+                            setEvents(eventData.events.instances);
+                            setToggle((prev) => !prev);
+                        }
+                    });
+
                 });
 
                 fetchEvents().then(eventData => {
@@ -410,20 +427,43 @@ export const EventsComponent = () => {
                         setSelectedTraining(trackedEntity);
                     }
                 });
+
+                fetchEventAndTrainings();
             }
             show({msg: i18n.t('Event successfully updated'), type: 'success'});
         }
     }
 
-    const saveRelationships = (trackedEntity) => {
-        const relationships = participants.filter(p => {
-            return (!event || !event.relationships?.length) || event?.relationships.find(rel => rel.from.trackedEntity.trackedEntity !== p.trackedEntity)
-        }).map(p => {
+    const deleteEvent = async () => {
+        setDeleting(true);
+        const result = await trackerDelete(engine, event);
+        if (result) {
+            show({msg: i18n.t('Event successfully deleted'), type: 'success'});
+            fetchEventAndTrainings();
+            setParticipants([])
+            setGroupValues({})
+            setEvent(null)
+            setSelectedTraining('');
+        } else {
+            show({msg: i18n.t('Could not delete Event'), type: 'error'});
+        }
+        setDeleting(false);
+    }
+
+    const saveRelationships = async (trackedEntity) => {
+        const needRelationship = participants.map(p => {
+            const rels = p.relationships?.find(rel => rel.from.trackedEntity.trackedEntity === p.trackedEntity);
+            if (!rels) {
+                return p.trackedEntity;
+            }
+            return null;
+        }).filter(tei => tei && tei.length > 0);
+        const relationships = needRelationship.map(p => {
             return {
                 relationshipType: EVENT_OPTIONS.relationshipType,
                 from: {
                     trackedEntity: {
-                        trackedEntity: p.trackedEntity
+                        trackedEntity: p
                     }
                 },
                 to: {
@@ -517,7 +557,7 @@ export const EventsComponent = () => {
     }
 
     const downloadAttendance = async () => {
-        /*const workbook = new ExcelJS.Workbook();
+        const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Attendance',
             {
                 headerFooter: {
@@ -551,7 +591,7 @@ export const EventsComponent = () => {
         const buffer = await workbook.xlsx.writeBuffer();
 
         // Save the Excel file
-        saveAs(new Blob([buffer]), 'Attendance.xlsx');*/
+        saveAs(new Blob([buffer]), 'Attendance.xlsx');
     }
 
     return (
@@ -620,14 +660,31 @@ export const EventsComponent = () => {
                                                             </div>
                                                             {(trainingAttributes || []).length > 0 && selectedVenue &&
                                                                 <div className="flex flex-row justify-end">
+                                                                    {selectedTraining && editMode &&
+                                                                        <button type="button"
+                                                                                disabled={deleting || loading}
+                                                                                className={(deleting || loading) ? 'warn-btn-disabled' : 'warn-btn'}
+                                                                                onClick={deleteEvent}>
+                                                                            <div
+                                                                                className="flex flex-row">
+                                                                                {deleting &&
+                                                                                    <div
+                                                                                        className="pr-2">
+                                                                                        <SpinnerComponent/>
+                                                                                    </div>
+                                                                                }
+                                                                                <span>Delete Event</span>
+                                                                            </div>
+                                                                        </button>
+                                                                    }
                                                                     <button type="button"
                                                                             onClick={saveTraining}
-                                                                            disabled={saving || loading}
+                                                                            disabled={saving || loading || !validateTraining()}
                                                                             className={loading || saving || !validateTraining() ? 'primary-btn-disabled' : 'primary-btn'}
                                                                     >
                                                                         <div
                                                                             className="flex flex-row">
-                                                                            {(saving || loading) &&
+                                                                        {(saving || loading) &&
                                                                                 <div
                                                                                     className="pr-2">
                                                                                     <SpinnerComponent/>
@@ -654,7 +711,7 @@ export const EventsComponent = () => {
                                                                             <option
                                                                                 selected>Select event
                                                                             </option>
-                                                                            {trainings.map(option => {
+                                                                            {trainings.sort((o1, o2)=> o1.label.localeCompare(o2.label)).map(option => {
                                                                                     return <>
                                                                                         <option
                                                                                             value={option.id}>{option.label}</option>
@@ -666,9 +723,48 @@ export const EventsComponent = () => {
                                                                 }
                                                                 {selectedVenue && ((editMode && selectedTraining) || !editMode) &&
                                                                     <DataElementsComponent data={memoizedData}
+                                                                                           disable={disable}
+                                                                                           setEditingOption={(editing) => setDisable(editing)}
                                                                                            valueChange={createOrUpdateGroupEvent}/>
                                                                 }
                                                             </div>
+                                                            {(trainingAttributes || []).length > 0 && selectedVenue &&
+                                                                <div className="flex flex-row justify-end">
+                                                                    {selectedTraining && editMode &&
+                                                                        <button type="button"
+                                                                                disabled={deleting || loading}
+                                                                                className={(deleting || loading) ? 'warn-btn-disabled' : 'warn-btn'}
+                                                                                onClick={deleteEvent}>
+                                                                            <div
+                                                                                className="flex flex-row">
+                                                                                {deleting &&
+                                                                                    <div
+                                                                                        className="pr-2">
+                                                                                        <SpinnerComponent/>
+                                                                                    </div>
+                                                                                }
+                                                                                <span>Delete Event</span>
+                                                                            </div>
+                                                                        </button>
+                                                                    }
+                                                                    <button type="button"
+                                                                            onClick={saveTraining}
+                                                                            disabled={saving || loading || !validateTraining()}
+                                                                            className={loading || saving || !validateTraining() ? 'primary-btn-disabled' : 'primary-btn'}
+                                                                    >
+                                                                        <div
+                                                                            className="flex flex-row">
+                                                                            {(saving || loading) &&
+                                                                                <div
+                                                                                    className="pr-2">
+                                                                                    <SpinnerComponent/>
+                                                                                </div>
+                                                                            }
+                                                                            <span>{editMode ? 'Update Event' : 'Create New Event'}</span>
+                                                                        </div>
+                                                                    </button>
+                                                                </div>
+                                                            }
                                                         </div>
                                                     </div>
                                                 }
@@ -681,7 +777,7 @@ export const EventsComponent = () => {
                                                     {loading &&
                                                         <SpinnerComponent/>
                                                     }
-                                                    <div className="flex flex-row justify-end">
+                                                    {/*<div className="flex flex-row justify-end">
                                                         {participants.length > 0 &&
                                                             <button type="button"
                                                                     onClick={downloadAttendance}
@@ -690,18 +786,18 @@ export const EventsComponent = () => {
                                                                 Download attendance
                                                             </button>
                                                         }
-                                                    </div>
+                                                    </div>*/}
                                                     <table
-                                                        className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                                        className="w-full text-sm text-left rtl:text-right text-gray-500 ">
                                                         <caption
-                                                            className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
+                                                            className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white ">
 
-                                                            <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                                            <p className="mt-1 text-sm font-normal text-gray-500 ">
                                                                 Training /Workshop participants
                                                             </p>
                                                         </caption>
                                                         <thead
-                                                            className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                            className="text-xs text-gray-700 uppercase bg-gray-50 ">
                                                         <tr>
                                                             <th data-priority="1"
                                                                 className="px-6 py-3 w-1/12">#
@@ -718,10 +814,10 @@ export const EventsComponent = () => {
                                                         <tbody>
                                                         {pagedParticipants.map((entity, index) => {
                                                             return <>
-                                                                <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                                                                <tr className="pr-3 text-right odd:bg-white  even:bg-gray-50  border-b ">
                                                                     <td>{index + 1}</td>
-                                                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
-                                                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
+                                                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap ">{getParticipant(entity, nameAttributes)}</td>
+                                                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap ">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
                                                                     <td>
                                                                         <button type="button"
                                                                                 className="warn-btn"
@@ -785,11 +881,11 @@ export const EventsComponent = () => {
                                                                 </div>
                                                             }
                                                             <table
-                                                                className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                                                className="w-full text-sm text-left rtl:text-right text-gray-500 0">
                                                                 <caption
-                                                                    className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
+                                                                    className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white d">
 
-                                                                    <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                                                    <p className="mt-1 text-sm font-normal text-gray-500 ">
 
                                                                     </p>
                                                                     {selectedEntities.length > 0 &&
@@ -801,7 +897,7 @@ export const EventsComponent = () => {
                                                                     }
                                                                 </caption>
                                                                 <thead
-                                                                    className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                                    className="text-xs text-gray-700 uppercase bg-gray-50 ">
                                                                 <tr>
                                                                     <th className="px-6 py-6 w-1/12">
                                                                         <div
@@ -834,7 +930,7 @@ export const EventsComponent = () => {
                                                                 <tbody>
                                                                 {entities.map((entity, index) => {
                                                                     return <>
-                                                                        <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                                                                        <tr className="pr-3 text-right odd:bg-white  even:bg-gray-50  border-b d">
                                                                             <td className="px-6 py-6">
                                                                                 <div
                                                                                     className="flex items-center mb-4">
@@ -852,9 +948,9 @@ export const EventsComponent = () => {
                                                                                 </div>
                                                                             </td>
                                                                             <td>{index + 1}</td>
-                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
-                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, ['Bj48LXj8FmH'])}</td>
-                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
+                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap ">{getParticipant(entity, nameAttributes)}</td>
+                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap ">{getParticipant(entity, ['Bj48LXj8FmH'])}</td>
+                                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap ">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
                                                                         </tr>
                                                                     </>
                                                                 })}

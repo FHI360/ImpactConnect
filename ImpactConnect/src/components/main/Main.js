@@ -6,7 +6,6 @@ import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS } from '../../consts.js';
 import {
     daysBetween,
     fetchEntities,
-    formatDate,
     getParticipant,
     isObjectEmpty,
     paginate,
@@ -30,7 +29,7 @@ export const Main = () => {
     const [stages, setStages] = useState([]);
     const [selectedStage, setSelectedStage] = useState('');
     const [orgUnits, setOrgUnits] = useState([]);
-    const [startDate, setStateDate] = useState(new Date());
+    const [startDate, setStartDate] = useState(new Date());
     const [endDate, setEndDate] = useState(null);
     const [trainings, setTrainings] = useState([]);
     const [page, setPage] = useState(1);
@@ -161,7 +160,7 @@ export const Main = () => {
         if (selectedTraining) {
             setLoading(true);
             setEntities([]);
-            setStateDate(null);
+            setStartDate(null);
             setEndDate(null);
 
             engine.query({
@@ -190,14 +189,14 @@ export const Main = () => {
 
                     res.training.attributes.forEach(attr => {
                         if (attr.attribute === EVENT_OPTIONS.attributes.startDate) {
-                            setStateDate(new Date(attr.value))
+                            setStartDate(attr.value)
                         } else if (attr.attribute === EVENT_OPTIONS.attributes.endDate) {
-                            setEndDate(new Date(attr.value))
+                            setEndDate(attr.value)
                         }
 
                         if (attr.attribute === EVENT_OPTIONS.attributes.activity) {
                             let selectedStage = '';
-                            switch (attr.value) {
+                            switch (+attr.value) {
                                 case 1:
                                     selectedStage = ACTIVITY_STAGE_MAPPING[1];
                                     break;
@@ -260,9 +259,19 @@ export const Main = () => {
         return groupValues[dataElement];
     }
 
+    const datePart = (date) => {
+        const regex = /^\d{4}-\d{2}-\d{2}/; // Matches YYYY-MM-DD at the beginning
+        const match = date.match(regex);
+
+        if (match) {
+            return match[0];
+        }
+        return '';
+    }
+
     const dataElementValue = (date, dataElement, entity) => {
         let event = entity.enrollments[0].events?.find(event => event.programStage === selectedStage
-            && formatDate(event.occurredAt) === formatDate(date.toISOString()));
+            && datePart(event.occurredAt) === datePart(date));
         const activeEvent = entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
         const editedEntity = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
 
@@ -272,15 +281,15 @@ export const Main = () => {
         }
         if (event) {
             let value;
-            if (editedEntity && editedEntity.values.some(v => formatDate(v.date) === formatDate(date) && v.dataElement.id === dataElement)) {
-                value = editedEntity.values.find(value => value.dataElement.id === dataElement && formatDate(date) === formatDate(value.date))?.value;
+            if (editedEntity && editedEntity.values.some(v => datePart(v.date) === datePart(date) && v.dataElement.id === dataElement)) {
+                value = editedEntity.values.find(value => value.dataElement.id === dataElement && datePart(date) === datePart(value.date))?.value;
             } else {
                 value = event.dataValues.find(dv => dv.dataElement === dataElement)?.value;
             }
             return (value ?? '') + '';
 
         } else if (editedEntity) {
-            return (editedEntity.values.find(value => value.dataElement.id === dataElement && formatDate(date) === formatDate(value.date))?.value ?? '') + '';
+            return (editedEntity.values.find(value => value.dataElement.id === dataElement && datePart(date) === datePart(value.date))?.value ?? '') + '';
         }
         return null;
     }
@@ -291,7 +300,7 @@ export const Main = () => {
         const events = [];
 
         const filterValues = (values, formattedDate) => {
-            return values.filter(value => formatDate(value.date) === formattedDate);
+            return values.filter(value => datePart(value.date) === formattedDate);
         }
 
         const _edits = edits;
@@ -314,9 +323,9 @@ export const Main = () => {
 
         //Loop through each edit records and recreate event data for
         _edits.forEach(edit => {
-            Map.groupBy(edit.values, ({date}) => formatDate(date)).keys().forEach(eventDate => {
+            Map.groupBy(edit.values, ({date}) => datePart(date)).keys().forEach(eventDate => {
                 let event = edit.entity?.enrollments[0].events?.find(event => event.programStage === selectedStage &&
-                    formatDate(event.occurredAt) === eventDate);
+                    datePart(event.occurredAt) === eventDate);
                 const values = filterValues(edit.values, eventDate);
 
                 if (!event) {
@@ -432,7 +441,7 @@ export const Main = () => {
                 values: []
             };
         }
-        const values = currentEdit.values.filter(v => !(v.dataElement.id === dataElement.id && formatDate(date) === formatDate(v.date)));
+        const values = currentEdit.values.filter(v => !(v.dataElement.id === dataElement.id && datePart(date) === datePart(v.date)));
         values.push({
             value,
             dataElement,
@@ -447,7 +456,7 @@ export const Main = () => {
                 return true;
             }
             return values1.some(value => {
-                const match = values2.find(v => v.dataElement.id === value.dataElement.id && formatDate(v.date) === formatDate(value.date));
+                const match = values2.find(v => v.dataElement.id === value.dataElement.id && datePart(v.date) === datePart(value.date));
                 if (!match) {
                     return true;
                 }
@@ -466,8 +475,8 @@ export const Main = () => {
                 setOriginalEdits([...originalEdits, {...currentEdit}]);
             } else {
                 const _originalEdits = originalEdits.filter(edit => edit.entity.trackedEntity !== entity.trackedEntity);
-                const oldValues = {...originalEdit}.values.filter(v => v.dataElement.id === dataElement.id && formatDate(v.date) === formatDate(date));
-                const newValues = currentEdit.values.filter(v => !(v.dataElement.id === dataElement.id && formatDate(v.date) === formatDate(date)));
+                const oldValues = {...originalEdit}.values.filter(v => v.dataElement.id === dataElement.id && datePart(v.date) === datePart(date));
+                const newValues = currentEdit.values.filter(v => !(v.dataElement.id === dataElement.id && datePart(v.date) === datePart(date)));
                 oldValues.push(...newValues);
                 setOriginalEdits([..._originalEdits, Object.assign({}, originalEdit, {values: oldValues})]);
             }
@@ -491,7 +500,7 @@ export const Main = () => {
         const configuredDataElements = [];
         const days = EVENT_OPTIONS.stageMapping.find(s => s.id === selectedStage)?.days;
         if (days) {
-            for (let i = 1; i <= daysBetween(startDate, endDate); i++) {
+            for (let i = 1; i <= daysBetween(new Date(startDate), new Date(endDate)); i++) {
                 configuredDataElements.push(days[i])
             }
         }
@@ -553,7 +562,7 @@ export const Main = () => {
                                                         {individualDataElementsForDates().map((id) => {
                                                             const de = dataElements.find(e => e.id === id)
                                                             return <>
-                                                                <div
+                                                                {de && <div
                                                                     className="flex flex-col my-auto pl-4">
                                                                     <DataElementComponent
                                                                         value={groupDataElementValue(de.id)}
@@ -565,6 +574,7 @@ export const Main = () => {
                                                                         }
                                                                     />
                                                                 </div>
+                                                                }
                                                             </>
                                                         })}
                                                     </div>
@@ -586,10 +596,10 @@ export const Main = () => {
                                                 </div>
                                             }
                                             <table
-                                                className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                                className="w-full text-sm text-left rtl:text-right text-gray-500 ">
                                                 <caption
-                                                    className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white dark:text-white dark:bg-gray-800">
-                                                    <p className="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
+                                                    className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white">
+                                                    <p className="mt-1 text-sm font-normal text-gray-500 ">
 
                                                     </p>
                                                     <div className="flex flex-row justify-end">
@@ -612,7 +622,7 @@ export const Main = () => {
                                                     </div>
                                                 </caption>
                                                 <thead
-                                                    className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                                    className="text-xs text-gray-700 uppercase bg-gray-50 ">
                                                 {!groupEdit && entities.length > 0 &&
                                                     <tr>
                                                         <td colSpan={groupEdit ? 4 : 3}
@@ -621,7 +631,7 @@ export const Main = () => {
                                                             const de = dataElements.find(e => e.id === id)
                                                             return <th key={idx}
                                                                        rowSpan={5}
-                                                                       style={{width: `${41.66 / daysBetween(startDate, endDate)}%`}}
+                                                                       style={{width: `${41.66 / daysBetween(new Date(startDate), new Date(endDate))}%`}}
                                                                        className="py-3 h-48">
                                                                         <span
                                                                             className="whitespace-nowrap block text-left -rotate-90 w-16 pb-4">{de?.name}</span>
@@ -662,7 +672,7 @@ export const Main = () => {
                                                 <tbody>
                                                 {pagedParticipants.map((entity, index) => {
                                                     return <>
-                                                        <tr className="pr-3 text-right odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700">
+                                                        <tr className="pr-3 text-right odd:bg-white even:bg-gray-50 ">
                                                             {groupEdit &&
                                                                 <td className="px-6 py-6">
                                                                     <div
@@ -696,8 +706,8 @@ export const Main = () => {
                                                                 </td>
                                                             }
                                                             <td>{index + 1}</td>
-                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{getParticipant(entity, nameAttributes)}</td>
-                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
+                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{getParticipant(entity, nameAttributes)}</td>
+                                                            <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap ">{orgUnits.find(ou => ou.id === entity.orgUnit)?.displayName}</td>
                                                             {!groupEdit && entities.length > 0 && dataElements.length > 0 && individualDataElementsForDates().map((cde, idx2) => {
                                                                 const de = dataElements.find(de => de.id === cde);
                                                                 return <>

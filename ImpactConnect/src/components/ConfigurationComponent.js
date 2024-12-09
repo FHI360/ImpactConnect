@@ -407,12 +407,12 @@ const ConfigurationComponent = () => {
                             {selectedProgram &&
                                 <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
                                     <label htmlFor="program"
-                                           className="block mb-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                           className="block mb-2 text-sm font-semibold text-gray-900 ">
                                         {i18n.t('Configure Data Elements')}
                                     </label>
                                     <div className="shadow-md rounded-md p-4 bg-white mb-4">
                                         <label htmlFor="program"
-                                               className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                               className="block mb-2 text-sm font-medium text-gray-900 ">
                                             {i18n.t('Configured Stages')}
                                         </label>
                                         <div className="w-full flex flex-col">
