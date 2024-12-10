@@ -1,18 +1,44 @@
+import { IconView24 } from '@dhis2/ui-icons';
 import PropTypes from 'prop-types';
-import React from 'react';
+import React, { useState } from 'react';
+import ConfigureCondition from './ConfiguredConditionComponent.js';
+import TooltipComponent from './TooltipComponent.js';
 
-export const ConfiguredDataElements =({caption, checkDataElements, dataElements, configuredStages, selectedStage, onDelete, onSave, onSelect, onSelectAll})=> {
+export const ConfiguredDataElements = ({
+                                           setSelectedConfiguredCondition,
+                                           configuredCondition,
+                                           stages,
+                                           caption,
+                                           checkDataElements,
+                                           dataElements,
+                                           configuredStages,
+                                           selectedStage,
+                                           onDelete,
+                                           onSave,
+                                           onSelect,
+                                           onSelectAll,
+                                           onCancel
+                                       }) => {
+    const [showConditionsModal, setShowConditionsModal] = useState(false);
+    const [selectedCondition, setSelectedConditions] = useState('');
+    const [deleteAction, setDeleteAction] = useState(false)
+
+    const handleConfigureCondition = (connditionID) => {
+        setSelectedConditions(connditionID)
+        setShowConditionsModal(true)
+    }
+
     return (
         <>
             <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
                 <div
                     className="relative overflow-x-auto shadow-md sm:rounded-lg">
                     <table
-                        className="w-full text-sm text-left rtl:text-right text-gray-500 ">
+                        className="w-full text-sm text-left rtl:text-right text-gray-500">
                         <caption
-                            className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white ">
-                            Data Elements
-                            <p className="mt-1 text-sm font-normal text-gray-500 ">
+                            className="p-5 text-lg font-semibold text-left rtl:text-right text-gray-900 bg-white">
+                            {stages.find(stage => stage.id === selectedStage)?.displayName}
+                            <p className="mt-1 text-sm font-normal text-gray-500 0">
                                 {caption}
                             </p>
                         </caption>
@@ -55,7 +81,18 @@ export const ConfiguredDataElements =({caption, checkDataElements, dataElements,
                                         </div>
                                     </td>
                                     <td>{index + 1}</td>
-                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap ">{dataElement.name}</td>
+                                    <td className="text-left px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{dataElement.name}
+                                        <TooltipComponent
+                                            IconType={IconView24}
+                                            btnFunc={handleConfigureCondition}
+                                            conditionID={dataElement.id}
+                                            // conditionID={selectedCondition}
+                                            dynamicText="Rule"
+                                            buttonMode="secondary"
+                                            customIcon={true}
+                                            disabled={false}
+                                        />
+                                    </td>
                                 </tr>
                             </>
                         })}
@@ -63,10 +100,14 @@ export const ConfiguredDataElements =({caption, checkDataElements, dataElements,
                         <tfoot>
                         <tr className="font-semibold text-gray-900 ">
                             <th colSpan={3} className="px-6 py-3 text-base">
+                                <button type="button"
+                                        className="default-btn py-1"
+                                        onClick={onCancel}>Cancel
+                                </button>
                                 {checkDataElements?.length > 0 &&
                                     <button type="button"
                                             className="primary-btn py-1"
-                                            onClick={onSave}>Save stage
+                                            onClick={onSave}>Next
                                     </button>
                                 }
                                 {configuredStages[selectedStage] &&
@@ -80,6 +121,17 @@ export const ConfiguredDataElements =({caption, checkDataElements, dataElements,
                         </tfoot>
                     </table>
                 </div>
+                {showConditionsModal &&
+                    <ConfigureCondition
+                        dataElements={dataElements}
+                        selectedCondition={selectedCondition}
+                        configuredCondition={configuredCondition}
+                        setShowConditionsModal={setShowConditionsModal}
+                        setSelectedConfiguredCondition={setSelectedConfiguredCondition}
+                        setDeleteAction={setDeleteAction}
+                        selectedStage={selectedStage}
+                    />
+                }
             </div>
         </>
     )
@@ -88,9 +140,13 @@ export const ConfiguredDataElements =({caption, checkDataElements, dataElements,
 ConfiguredDataElements.propTypes = {
     caption: PropTypes.string,
     checkDataElements: PropTypes.array,
+    configuredCondition: PropTypes.array,
     configuredStages: PropTypes.object,
     dataElements: PropTypes.array,
     selectedStage: PropTypes.string,
+    setSelectedConfiguredCondition: PropTypes.func,
+    stages: PropTypes.array,
+    onCancel: PropTypes.func,
     onDelete: PropTypes.func,
     onSave: PropTypes.func,
     onSelect: PropTypes.func,
