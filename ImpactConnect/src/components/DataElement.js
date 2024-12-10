@@ -3,6 +3,8 @@ import i18n from '@dhis2/d2-i18n';
 import { CalendarInput } from '@dhis2/ui';
 import PropTypes from 'prop-types';
 import React, { useEffect, useMemo, useState } from 'react';
+import { EVENT_OPTIONS } from '../consts.js';
+import { applyConditionAction } from '../utils.js';
 import { SpinnerComponent } from './SpinnerComponent.js';
 
 export const DataElementComponent = ({
@@ -13,9 +15,14 @@ export const DataElementComponent = ({
                                          required,
                                          valueChanged,
                                          readonly,
+                                         values,
+                                         stage,
+                                         conditions,
                                          optionAdd = false,
                                          setEditingOption = (_) => {
-                                         }
+                                         },
+                                         setInvalid = (valid) => {},
+                                         optionRenamed = (oldName, newName) => {}
                                      }) => {
     const engine = useDataEngine();
 
@@ -31,6 +38,11 @@ export const DataElementComponent = ({
     const [optionSetId, setOptionSetId] = useState('');
     const [loading, setLoading] = useState(false);
     const [selectedValue, setSelectedValue] = useState('');
+    const [visible, setVisible] = useState(true);
+    const [enabled, setEnabled] = useState(true);
+    const [warning, setWarning] = useState(false);
+    const [elementValue, setElementValue] = useState(null);
+    const [toggle, setToggle] = useState(false);
 
     const memorizedOptionSetId = useMemo(() => optionSetId, [optionSetId]);
 
@@ -67,14 +79,53 @@ export const DataElementComponent = ({
                 setLoading(false);
             });
         }
-    }, [memorizedOptionSetId]);
+    }, [memorizedOptionSetId, toggle]);
 
-    if (dataElement?.id === 'CJ7g6K9Ukvf') {
+    useEffect(() => {
+        const condition = applyConditionAction(conditions, stage, dataElement, values, elementValue);
+        if (condition.action === 'disable') {
+            setEnabled(false);
+        } else {
+            setEnabled(true);
+        }
+        if (condition.action === 'hide') {
+            setVisible(false);
+        } else {
+            setVisible(true);
+        }
+        if (condition.action === 'show_warning') {
+            setWarning(true);
+        } else {
+            setWarning(false);
+        }
+        if (condition.action === 'mark_invalid') {
+            setInvalid(true);
+        } else {
+            setInvalid(false)
+        }
+    }, [values, conditions, stage, dataElement, elementValue]);
+
+    useEffect(() => {
+        if (warning) {
+            if (warning) {
+                show({msg: i18n.t('Value cannot be updated as conditions not met'), type: 'error'});
+                valueChanged(dataElement, '');
+            }
+        }
+    }, [warning]);
+
+    if (dataElement?.id === EVENT_OPTIONS.attributes.event) {
         optionAdd = true;
+    }
+
+    const updateValue = (value) => {
+        setElementValue(value);
+        valueChanged(dataElement, value);
     }
 
     const renameOption = () => {
         const option = options.find(opt => opt.code === selectedValue);
+        const oldName = option.displayName;
         if (option) {
             setLoading(true);
             option.displayName = optionLabel.replace(/\s+/g, ' ').trim();
@@ -98,6 +149,7 @@ export const DataElementComponent = ({
                     return updatedOptions;
                 });
 
+                optionRenamed(oldName, option.displayName);
                 setEdit(false);
                 setLoading(false);
             });
@@ -156,6 +208,8 @@ export const DataElementComponent = ({
                         }).then(res => {
                             if (res.status === 'OK') {
                                 setOptionValue(option.code);
+                                setSelectedValue(option.code);
+                                setToggle((prev) => !prev)
 
                                 show({msg: i18n.t('Option successfully added'), type: 'success'});
                                 setLoading(false);
@@ -201,17 +255,17 @@ export const DataElementComponent = ({
     return (
         <>
             <div>
-                {dataElement?.optionSet?.id &&
+                {dataElement?.optionSet?.id && visible &&
                     <div className="flex flex-col">
                         {labelVisible &&
                             <label className="label">
-                                {label || dataElement.name || dataElement.displayName} {dataElement?.id === 'CJ7g6K9Ukvf' && <span className="required">*</span>}
+                                {label || dataElement.name || dataElement.displayName} {dataElement?.id === EVENT_OPTIONS.attributes.event && <span className="required">*</span>}
                             </label>
                         }
                         <div className="flex flex-row">
                             <select className="select"
                                     value={value ?? optionValue ?? ''}
-                                    disabled={readonly && !edit}
+                                    disabled={(readonly && !edit) || !enabled}
                                     onChange={(event) => {
                                         setEdit(false);
                                         valueChanged(dataElement, event.target.value);
@@ -230,7 +284,7 @@ export const DataElementComponent = ({
                                     </>
                                 )}
                             </select>
-                            {!edit && !readonly && optionAdd &&
+                            {!edit && !readonly && optionAdd && enabled &&
                                 <>
                                     <div className="p-1" onClick={() => {
                                         setEdit(true);
@@ -313,13 +367,13 @@ export const DataElementComponent = ({
                         }
                     </div>
                 }
-                {dataElement && !dataElement?.optionSet?.id &&
+                {dataElement && !dataElement?.optionSet?.id && visible &&
                     <>
                         {((dataElement.valueType === 'TRUE_ONLY' || dataElement.valueType === 'BOOLEAN')) &&
                             <div className="flex items-center mb-4">
                                 <input
                                     type="checkbox"
-                                    disabled={readonly}
+                                    disabled={readonly || !enabled}
                                     checked={toBoolean(value)}
                                     onChange={(event) => valueChanged(dataElement, event.target.checked)}
                                     className="checkbox"/>
@@ -341,7 +395,7 @@ export const DataElementComponent = ({
                                 <input
                                     type="number"
                                     value={value ?? ''}
-                                    disabled={readonly}
+                                    disabled={readonly || !enabled}
                                     onChange={(event) => {
                                         if (validateNumericInput(event)) {
                                             valueChanged(dataElement, event.target.value);
@@ -361,7 +415,7 @@ export const DataElementComponent = ({
                                 <input
                                     type="text"
                                     value={value ?? ''}
-                                    disabled={readonly}
+                                    disabled={readonly || !enabled}
                                     onChange={(event) => valueChanged(dataElement, event.target.value)}
                                     className="text-input"/>
                             </div>
@@ -376,7 +430,7 @@ export const DataElementComponent = ({
                                 <CalendarInput
                                     calendar="gregory"
                                     label=""
-                                    disabled={readonly}
+                                    disabled={readonly || !enabled}
                                     date={(value ?? '').substring(0, 10)}
                                     onDateSelect={(event) => valueChanged(dataElement, new Date(event.calendarDateString).toISOString())}
                                 />
@@ -390,12 +444,18 @@ export const DataElementComponent = ({
 }
 
 DataElementComponent.propTypes = {
+    conditions: PropTypes.array,
     dataElement: PropTypes.object,
     label: PropTypes.string,
     labelVisible: PropTypes.bool,
     optionAdd: PropTypes.bool,
+    optionRenamed: PropTypes.func,
     readonly: PropTypes.bool,
+    required: PropTypes.bool,
     setEditingOption: PropTypes.func,
+    setInvalid: PropTypes.func,
+    stage: PropTypes.string,
     value: PropTypes.string,
-    valueChanged: PropTypes.func
+    valueChanged: PropTypes.func,
+    values: PropTypes.object
 };

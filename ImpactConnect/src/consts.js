@@ -28,6 +28,7 @@ export const project_description = 'This application resolves duplicate issues'
 export const panelAction = 'Finding duplicate tracked entities'
 
 export const VENUE_NAME = 'Training/Meeting/Workshop Venues';
+export const MEL_TEAM = 'MEL Team';
 export const TRAINING_STAGES = {
     TRAINING: 'SmUprI011oN',
     WORKSHOP: 'rPMeg1cK9Pu',
@@ -45,7 +46,9 @@ export const EVENT_OPTIONS = {
         endDate: 'KPwanQQE4FU',
         activity: 'G0Ab3IHVx6W',
         days: 'oIZRuzzHXxa',
-        event: 'CJ7g6K9Ukvf'
+        event: 'CJ7g6K9Ukvf',
+        facilitators: 'WSOC4pHc34X',
+        uniqueName: 'rlCta8FG2fz'
     },
     relationshipType: 'iBFMyo4S0Nn',
     stageMapping: [
@@ -71,7 +74,8 @@ export const EVENT_OPTIONS = {
                 8: 'nz0xDT9pdgw',
                 9: 'SdP4s8SRDX1',
                 10: 'aX5CYDBVHBF'
-            }
+            },
+            venue: 'nr2KeppSpJu'
         },
         {
             id: TRAINING_STAGES.WORKSHOP,
@@ -95,7 +99,8 @@ export const EVENT_OPTIONS = {
                 8: 'RsJHkrx1Kix',
                 9: 'e62s5XIxZ8Z',
                 10: 'cxjrWicpNUA'
-            }
+            },
+            venue: 'HzFrujoVvp4'
         },
         {
             id: TRAINING_STAGES.MEETING,
@@ -119,7 +124,8 @@ export const EVENT_OPTIONS = {
                 8: 'JRwbsqHB9du',
                 9: 'PnHYe0lQsXF',
                 10: 'ENpSRYFyYWe'
-            }
+            },
+            venue: 'rMxu6V1U2oZ'
         }
     ]
 }
@@ -127,5 +133,5 @@ export const EVENT_OPTIONS = {
 export const REPORT = {
     PHONE: 'ls0TZ2qIQY4',
     GENDER: 'RFDW6SognD1',
-    POSITION: 'oRJhK50Ttid'
+    POSITION: 'GT99Xd3kyVN'
 }

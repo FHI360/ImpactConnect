@@ -1,6 +1,6 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
-import { Pagination } from '@dhis2/ui';
+import { Modal, ModalActions, ModalContent, ModalTitle, Pagination, Transfer } from '@dhis2/ui';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -61,6 +61,11 @@ export const EventsComponent = () => {
     const [disable, setDisable] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [toggle, setToggle] = useState(false);
+    const [configuredCondition, setSelectedConfiguredCondition] = useState([]);
+    const [confirmShow, setConfirmShow] = useState(false);
+    const [invalid, setInvalid] = useState(false);
+    const [users, setUsers] = useState([]);
+    const [facilitators, setFacilitators] = useState([]);
 
     const memoizedData = useMemo(() => {
         return {
@@ -106,6 +111,19 @@ export const EventsComponent = () => {
         }
     }
 
+    const usersQuery = {
+        users: {
+            resource: 'users',
+            params: {
+                paging: false,
+                fields: ['username', 'displayName'],
+                order: 'displayName'
+            }
+        }
+    }
+
+    const {data: userData} = useDataQuery(usersQuery);
+
     const {data: entityData, refetch} = useDataQuery(entitiesQuery, {
         variables: {
             program: participantsProgram,
@@ -130,6 +148,19 @@ export const EventsComponent = () => {
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
     useEffect(() => {
+        if (userData && userData.users) {
+            const users = userData.users.users.map(user => {
+                return {
+                    value: user.username,
+                    label: user.displayName
+                }
+            });
+            setUsers(users);
+        }
+
+    }, [userData])
+
+    useEffect(() => {
         if (dataStore?.dataStore?.entries) {
             const entry = dataStore.dataStore.entries.find(e => e.key === `${config.dataStoreKey}`);
             if (entry) {
@@ -138,6 +169,7 @@ export const EventsComponent = () => {
                 setTrainingProgram(entry.value.trainingProgram);
                 setParticipantsProgram(entry.value.participantsProgram);
                 setEventNameAttribute(entry.value.eventNameAttribute);
+                setSelectedConfiguredCondition(entry.value.configuredCondition || []);
             }
         }
     }, [dataStore]);
@@ -216,6 +248,7 @@ export const EventsComponent = () => {
     }, [entityType, selectedVenue]);
 
     useEffect(() => {
+        setFacilitators([]);
         const training = events.find(evt => evt.trackedEntity === selectedTraining);
         if (training) {
             setLoading(true);
@@ -225,7 +258,13 @@ export const EventsComponent = () => {
             })
             setGroupValues(values);
 
+            const facilitators = training.attributes.find(attr => attr.attribute === EVENT_OPTIONS.attributes.facilitators)?.value;
+            if (facilitators && facilitators.length) {
+                setFacilitators(facilitators.split(','))
+            }
+
             setParticipants([]);
+
             const ids = training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
             if (ids.length > 0) {
                 fetchEntities(engine, ids, 'trackedEntity,orgUnit,attributes,relationships').then(value => {
@@ -269,6 +308,14 @@ export const EventsComponent = () => {
             window.removeEventListener('resize', adjustScrollHeight);
         };
     }, []);
+
+    useEffect(() => {
+        if (groupValues[EVENT_OPTIONS.attributes.startDate] && groupValues[EVENT_OPTIONS.attributes.endDate]) {
+            if (new Date(groupValues[EVENT_OPTIONS.attributes.startDate]) > new Date(groupValues[EVENT_OPTIONS.attributes.endDate])) {
+                show({ msg: i18n.t('Start date cannot be after end date'), type: 'error' });
+            }
+        }
+    }, [groupValues]);
 
     const fetchEventAndTrainings = () => {
         fetchEvents().then(eventData => {
@@ -371,6 +418,12 @@ export const EventsComponent = () => {
             attribute: EVENT_OPTIONS.attributes.days,
             value: daysBetween(new Date(groupDataElementValue(EVENT_OPTIONS.attributes.startDate)), new Date(groupDataElementValue(EVENT_OPTIONS.attributes.endDate)))
         });
+
+        attributes.push({
+            attribute: EVENT_OPTIONS.attributes.facilitators,
+            value: facilitators.join()
+        });
+
         let entity = {
             orgUnit: selectedVenue,
             trackedEntityType: type,
@@ -429,6 +482,17 @@ export const EventsComponent = () => {
                 });
 
                 fetchEventAndTrainings();
+
+                const training = events.find(evt => evt.trackedEntity === selectedTraining);
+                if (training) {
+                    const ids = training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
+                    if (ids.length > 0) {
+                        fetchEntities(engine, ids, 'trackedEntity,orgUnit,attributes,relationships').then(value => {
+                            const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
+                            setParticipants(attendees);
+                        });
+                    }
+                }
             }
             show({msg: i18n.t('Event successfully updated'), type: 'success'});
         }
@@ -521,8 +585,15 @@ export const EventsComponent = () => {
     const validateTraining = () => {
         return trainingAttributesData.every(ta => {
             const valueType = ta.valueType;
-            if (ta.id === 'oIZRuzzHXxa' || ta.id === 'rlCta8FG2fz') {
+            if (ta.id === EVENT_OPTIONS.attributes.uniqueName || ta.id === EVENT_OPTIONS.attributes.days) {
                 return true;
+            }
+            if (ta.id === EVENT_OPTIONS.attributes.facilitators) {
+                if (facilitators.length === 0) {
+                    return false;
+                } else {
+                    return true;
+                }
             }
             if (valueType === 'TRUE_ONLY' || valueType === 'BOOLEAN') {
                 return true;
@@ -543,6 +614,9 @@ export const EventsComponent = () => {
                 const value = parseInt(groupValues[ta.id]);
                 return value > 0;
             }
+            if (new Date(groupValues[EVENT_OPTIONS.attributes.startDate]) > new Date(groupValues[EVENT_OPTIONS.attributes.endDate])) {
+                return false;
+            }
             return !!groupValues[ta.id] && groupValues[ta.id] !== 'Select one';
         });
     }
@@ -555,6 +629,53 @@ export const EventsComponent = () => {
             setEntities(allEntities);
         }
     }
+
+    const renameOption = (oldName, newName) => {
+
+    }
+
+    const retrySave = async (callback, times = 3) => {
+        let numberOfTries = 0;
+        let isResolved = false; // Track whether the callback succeeded
+
+        return new Promise((resolve, reject) => {
+            const attempt = async () => {
+                if (isResolved || numberOfTries >= times) {
+                    return; // Stop if already resolved or maximum attempts reached
+                }
+
+                numberOfTries++;
+
+                try {
+                    await callback(); // Attempt the callback
+                    isResolved = true; // Mark as resolved
+                    resolve(); // Resolve the promise on success
+                } catch (err) {
+                    if (numberOfTries >= times) {
+                        show({msg: i18n.t('There was an error updating records'), type: 'error'});
+                        setSaving(false);
+                        reject(err); // Reject the promise if all retries fail
+                    } else {
+                        console.log(`Retrying... Attempt ${numberOfTries} of ${times}`);
+                    }
+                }
+            };
+
+            // Run the attempt function at regular intervals
+            const interval = setInterval(() => {
+                if (isResolved) {
+                    clearInterval(interval); // Stop the interval if resolved
+                } else {
+                    attempt().catch(err => console.error('Unexpected error in retry logic:', err));
+                }
+            }, 2500);
+
+            // Ensure the interval is cleared if the promise resolves or rejects
+            resolve().finally(() => clearInterval(interval));
+            reject().finally(() => clearInterval(interval));
+        });
+    };
+
 
     const downloadAttendance = async () => {
         const workbook = new ExcelJS.Workbook();
@@ -611,13 +732,13 @@ export const EventsComponent = () => {
                                                            className="label">
                                                         {i18n.t('Event Venue')}
                                                     </label>
-                                                    <VenueComponent
-                                                        venueSelected={(venue) => setSelectedVenue(venue)}/>
-                                                    {!selectedVenue &&
-                                                        <label className="label pl-2 pt-4 text-sm italic">
+                                                    <div className="border border-blue-500 mb-2">
+                                                        <label className="label pl-2 pt-2 text-sm italic">
                                                             Select a venue to begin configuring an event
                                                         </label>
-                                                    }
+                                                    </div>
+                                                    <VenueComponent
+                                                        venueSelected={(venue) => setSelectedVenue(venue)}/>
                                                 </div>
                                                 {selectedVenue &&
                                                     <div
@@ -664,7 +785,7 @@ export const EventsComponent = () => {
                                                                         <button type="button"
                                                                                 disabled={deleting || loading}
                                                                                 className={(deleting || loading) ? 'warn-btn-disabled' : 'warn-btn'}
-                                                                                onClick={deleteEvent}>
+                                                                                onClick={() => setConfirmShow(true)}>
                                                                             <div
                                                                                 className="flex flex-row">
                                                                                 {deleting &&
@@ -678,13 +799,22 @@ export const EventsComponent = () => {
                                                                         </button>
                                                                     }
                                                                     <button type="button"
-                                                                            onClick={saveTraining}
-                                                                            disabled={saving || loading || !validateTraining()}
-                                                                            className={loading || saving || !validateTraining() ? 'primary-btn-disabled' : 'primary-btn'}
+                                                                            onClick={() => {
+                                                                                /*retrySave(saveTraining)
+                                                                                    .then(() => {
+                                                                                        console.log('Training saved successfully after retries');
+                                                                                    })
+                                                                                    .catch(err => {
+                                                                                        console.error('Failed to save training:', err);
+                                                                                    });*/
+                                                                                saveTraining()
+                                                                            }}
+                                                                            disabled={saving || loading || !validateTraining() || invalid}
+                                                                            className={loading || saving || !validateTraining() || invalid ? 'primary-btn-disabled' : 'primary-btn'}
                                                                     >
                                                                         <div
                                                                             className="flex flex-row">
-                                                                        {(saving || loading) &&
+                                                                            {(saving || loading) &&
                                                                                 <div
                                                                                     className="pr-2">
                                                                                     <SpinnerComponent/>
@@ -711,7 +841,7 @@ export const EventsComponent = () => {
                                                                             <option
                                                                                 selected>Select event
                                                                             </option>
-                                                                            {trainings.sort((o1, o2)=> o1.label.localeCompare(o2.label)).map(option => {
+                                                                            {trainings.sort((o1, o2) => o1.label.localeCompare(o2.label)).map(option => {
                                                                                     return <>
                                                                                         <option
                                                                                             value={option.id}>{option.label}</option>
@@ -722,10 +852,33 @@ export const EventsComponent = () => {
                                                                     </div>
                                                                 }
                                                                 {selectedVenue && ((editMode && selectedTraining) || !editMode) &&
-                                                                    <DataElementsComponent data={memoizedData}
-                                                                                           disable={disable}
-                                                                                           setEditingOption={(editing) => setDisable(editing)}
-                                                                                           valueChange={createOrUpdateGroupEvent}/>
+                                                                    <>
+                                                                        <DataElementsComponent data={memoizedData}
+                                                                                               disable={disable}
+                                                                                               configuredCondition={configuredCondition}
+                                                                                               setInvalid={(invalid) => setInvalid(invalid)}
+                                                                                               setEditingOption={(editing) => setDisable(editing)}
+                                                                                               valueChange={createOrUpdateGroupEvent}
+                                                                                               optionRenamed={(oldName, newName) => renameOption(oldName, newName)}/>
+
+                                                                        <div className="card">
+                                                                            <label className="label">
+                                                                                {i18n.t('Event Facilitator(s)')}
+                                                                            </label>
+                                                                            <Transfer options={users}
+                                                                                      selected={facilitators}
+                                                                                      leftHeader={<div
+                                                                                          className="p-2 font-semibold">Available
+                                                                                          Users</div>}
+                                                                                      rightHeader={<div
+                                                                                          className="p-2 font-semibold">Facilitator(s)</div>}
+                                                                                      onChange={(payload) => {
+                                                                                          setFacilitators(payload.selected);
+                                                                                      }}
+                                                                                      enableOrderChange
+                                                                            />
+                                                                        </div>
+                                                                    </>
                                                                 }
                                                             </div>
                                                             {(trainingAttributes || []).length > 0 && selectedVenue &&
@@ -734,7 +887,7 @@ export const EventsComponent = () => {
                                                                         <button type="button"
                                                                                 disabled={deleting || loading}
                                                                                 className={(deleting || loading) ? 'warn-btn-disabled' : 'warn-btn'}
-                                                                                onClick={deleteEvent}>
+                                                                                onClick={() => setConfirmShow(true)}>
                                                                             <div
                                                                                 className="flex flex-row">
                                                                                 {deleting &&
@@ -748,9 +901,18 @@ export const EventsComponent = () => {
                                                                         </button>
                                                                     }
                                                                     <button type="button"
-                                                                            onClick={saveTraining}
-                                                                            disabled={saving || loading || !validateTraining()}
-                                                                            className={loading || saving || !validateTraining() ? 'primary-btn-disabled' : 'primary-btn'}
+                                                                            onClick={() => {
+                                                                                /*retrySave(saveTraining)
+                                                                                    .then(() => {
+                                                                                        console.log('Training saved successfully after retries');
+                                                                                    })
+                                                                                    .catch(err => {
+                                                                                        console.error('Failed to save training:', err);
+                                                                                    });*/
+                                                                                saveTraining();
+                                                                            }}
+                                                                            disabled={saving || loading || !validateTraining() || invalid}
+                                                                            className={loading || saving || !validateTraining() || invalid ? 'primary-btn-disabled' : 'primary-btn'}
                                                                     >
                                                                         <div
                                                                             className="flex flex-row">
@@ -858,15 +1020,15 @@ export const EventsComponent = () => {
                                         {selectedVenue &&
                                             <div className="w-full flex flex-row pt-2">
                                                 <div className="w-3/12 p-2 mt-2 mb-2 bg-white">
+                                                    <div className="border border-blue-500 mb-2">
+                                                        <label className="label pl-2 pt-2 text-sm italic">
+                                                            Select an Org Unit to get potential attendees
+                                                        </label>
+                                                    </div>
                                                     <OrganisationUnitComponent
                                                         handleOUChange={orgUnitChanged}
                                                         selectedOU={selectedOu}
                                                     />
-                                                    {!orgUnit &&
-                                                        <label className="label pl-2 pt-2 text-sm italic">
-                                                            Select an Org Unit to get potential attendees
-                                                        </label>
-                                                    }
                                                 </div>
                                                 <div className="w-9/12 p-2">
                                                     <div className="p-8 mt-6 lg:mt-0 rounded shadow bg-white">
@@ -991,6 +1153,32 @@ export const EventsComponent = () => {
                     </div>
                 </div>
             </div>
+            <Modal hide={!confirmShow}>
+                <ModalTitle>Delete Event</ModalTitle>
+
+                <ModalContent>
+                    Click ok to delete event. The process is not reversible
+                </ModalContent>
+
+                <ModalActions>
+                    <button type="button"
+                            className="py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100"
+                            onClick={() => {
+                                setConfirmShow(false);
+                            }}>
+                        Cancel
+                    </button>
+
+                    <button type="button"
+                            className="text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 focus:outline-none"
+                            onClick={() => {
+                                setConfirmShow(false);
+                                deleteEvent();
+                            }}>
+                        Delete
+                    </button>
+                </ModalActions>
+            </Modal>
         </>
     )
 }

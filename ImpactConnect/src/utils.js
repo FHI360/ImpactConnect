@@ -493,3 +493,61 @@ export const getAttribute = (entity, attribute)=> {
     const attributes = entity.enrollments && entity.enrollments.length > 0 && entity.enrollments[0].attributes || entity.attributes;
     return attributes.find(attr => attr.attribute === attribute)?.value
 }
+
+
+export const applyConditionAction = (conditions, stage, dataElement, values, value) => {
+    const stageHasRule = (conditions || []).some(condition => condition.selectedStage === stage);
+    if (stageHasRule) {
+        for (const condition of conditions) {
+            if (condition.dataElement_two === dataElement.id) {
+                const dataElementOne = condition.dataElement_one || '';
+                if (condition.action === 'disable' || condition.action === 'hide' || condition.action === 'show_warning') {
+                    if (value && condition.operator === 'equals' && values[dataElementOne] === value ||
+                        condition.operator === 'less_than' && values[dataElementOne] < value ||
+                        condition.operator === 'greater_than' && values[dataElementOne] > value ||
+                        condition.operator === 'is_empty' && !values[dataElementOne]) {
+                        return {
+                            action: condition.action
+                        }
+                    }
+                }
+                if (condition.action === 'mark_invalid') {
+                    if (condition.operator === 'is_not_empty' && !value &&  values[dataElementOne]) {
+                        return {
+                            action: condition.action
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return {
+        action: ''
+    }
+}
+
+export const applyAssignAction = (conditions, stage, dataElement, values) => {
+    const stageHasRule = (conditions || []).some(condition => condition.selectedStage === stage);
+    if (stageHasRule) {
+        for (const condition of conditions) {
+            if (condition.dataElement_one === dataElement.id) {
+                const dataElementOne = condition.dataElement_two || '';
+                if (condition.action === 'assign') {
+                    if (condition.operator === 'equals' && (values[dataElementOne] ?? '') + '' === condition.value_text ||
+                        condition.operator === 'less_than' && values[dataElementOne] < condition.value_text ||
+                        condition.operator === 'greater_than' && values[dataElementOne] > condition.value_text ||
+                        condition.operator === 'is_empty' && !values[dataElementOne]) {
+                        return {
+                            value: condition.value_text
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return {
+        value: ''
+    }
+}

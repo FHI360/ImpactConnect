@@ -2,7 +2,7 @@ import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
 import React, { useEffect, useState } from 'react';
-import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS } from '../../consts.js';
+import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS, MEL_TEAM } from '../../consts.js';
 import {
     daysBetween,
     fetchEntities,
@@ -48,6 +48,10 @@ export const Main = () => {
     const [eventAttributes, setEventAttributes] = useState([]);
     const [scrollHeight, setScrollHeight] = useState('350px');
     const [eventsLoading, setEventsLoading] = useState(false);
+    const [user, setUser] = useState('');
+    const [root, setRoot] = useState('');
+    const [groups, setGroups] = useState([]);
+    const [venue, setVenue] = useState('');
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -59,6 +63,15 @@ export const Main = () => {
             resource: `dataStore/${config.dataStoreName}?fields=.`,
         }
     };
+
+    const userQuery = {
+        user: {
+            resource: 'me',
+            params: {
+                fields: 'username, organisationUnits(id, root), userGroups(id, displayName)'
+            }
+        }
+    }
 
     const dataElementsQuery = {
         programStage: {
@@ -86,6 +99,16 @@ export const Main = () => {
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
     const {data: orgUnitsData} = useDataQuery(organisationsQuery);
+
+    const {data: userData} = useDataQuery(userQuery);
+
+    useEffect(() => {
+        if (userData?.user) {
+            setRoot(userData.user.organisationUnits[0].id);
+            setUser(userData.user.username);
+            setGroups(userData.user.userGroups.map(ug => ug.displayName));
+        }
+    }, [userData])
 
     useEffect(() => {
         if (dataStore?.dataStore?.entries) {
@@ -116,7 +139,7 @@ export const Main = () => {
     }, [elementsData]);
 
     useEffect(() => {
-        if (trainingProgram) {
+        if (trainingProgram && root) {
             setEventsLoading(true);
 
             engine.query({
@@ -126,21 +149,34 @@ export const Main = () => {
                         program: trainingProgram,
                         ouMode: 'DESCENDANTS',
                         paging: false,
-                        fields: 'attributes,trackedEntity',
-                        orgUnit: 'nLbABkQlwaT'
+                        fields: 'attributes,trackedEntity,orgUnit(displayName)',
+                        orgUnit: root
                     }
                 }
             }).then(res => {
                 if (res && res.trainings) {
-                    const trainings = new Set(res.trainings.instances.flatMap(i => {
+                    const filteredTrainings = res.trainings.instances.filter(training => {
+                        const facilitatorMatches = training.attributes.some(attr => {
+                            const facilitators = attr.attribute === EVENT_OPTIONS.attributes.facilitators && attr.value;
+                            return facilitators && facilitators.split(',').includes(user);
+                        });
+                        if (groups.includes(MEL_TEAM)) {
+                            return true;
+                        }
+                        return facilitatorMatches;
+                    });
+
+                    const trainings = new Set(filteredTrainings.flatMap(i => {
                         return i.attributes.map(attr => {
                             attr['trackedEntity'] = i.trackedEntity;
+                            attr['orgUnit'] = i.orgUnit;
                             return attr;
                         })
                     }).filter(attr => attr.attribute === eventNameAttribute).map(attr => {
                         return {
                             id: attr.trackedEntity,
-                            label: attr.value
+                            label: attr.value,
+                            orgUnit: attr.orgUnit
                         }
                     }));
                     setTrainings(Array.from(trainings));
@@ -150,7 +186,7 @@ export const Main = () => {
             })
         }
 
-    }, [trainingProgram])
+    }, [trainingProgram, root])
 
     useEffect(() => {
         pageParticipants();
@@ -162,6 +198,12 @@ export const Main = () => {
             setEntities([]);
             setStartDate(null);
             setEndDate(null);
+
+            const orgUnit = trainings.find(training => training.id === selectedTraining)?.orgUnit
+            if (orgUnit) {
+                const venue = orgUnits.find(ou => ou.id === orgUnit)?.displayName;
+                setVenue(venue);
+            }
 
             engine.query({
                 training: {
@@ -261,7 +303,7 @@ export const Main = () => {
 
     const datePart = (date) => {
         const regex = /^\d{4}-\d{2}-\d{2}/; // Matches YYYY-MM-DD at the beginning
-        const match = date.match(regex);
+        const match = date?.match(regex);
 
         if (match) {
             return match[0];
@@ -338,7 +380,7 @@ export const Main = () => {
                             enrollment: edit.entity.enrollments[0].enrollment,
                             trackedEntity: edit.entity.trackedEntity,
                             orgUnit: edit.entity.orgUnit,
-                            occurredAt: values[0].date.toISOString(),
+                            occurredAt: values[0].date,
                             dataValues: []
                         }
                     }
@@ -376,6 +418,12 @@ export const Main = () => {
                         value: groupValues[key]
                     }
                 }));
+
+                const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+                attributes.push({
+                    dataElement: mapping.venue,
+                    value: venue
+                })
 
                 attributes.forEach(de => {
                     const dataValue = event.dataValues.find(dv => dv.dataElement === de.dataElement) || {};
@@ -554,16 +602,21 @@ export const Main = () => {
                                         <div className="flex flex-col w-full mb-2">
                                             {groupEdit && entities.length > 0 &&
                                                 <div className="card">
-                                                    <div className="flex flex-col w-3/12 p-6">
+                                                    <div className="flex flex-col w-6/12 p-6">
                                                         <label htmlFor="program"
                                                                className="label pb-2">
                                                             Attendance
                                                         </label>
+                                                        <div className="border border-blue-500 mb-2">
+                                                            <label className="label pl-2 pt-2 text-sm italic">
+                                                                Select at least 1 attendee to enable days
+                                                            </label>
+                                                        </div>
                                                         {individualDataElementsForDates().map((id) => {
                                                             const de = dataElements.find(e => e.id === id)
                                                             return <>
                                                                 {de && <div
-                                                                    className="flex flex-col my-auto pl-4">
+                                                                    className="flex flex-col my-auto pl-4 w-3/12">
                                                                     <DataElementComponent
                                                                         value={groupDataElementValue(de.id)}
                                                                         dataElement={de}

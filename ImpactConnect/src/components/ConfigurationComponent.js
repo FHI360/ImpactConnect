@@ -44,6 +44,7 @@ const ConfigurationComponent = () => {
     const [stages, setStages] = useState([]);
     const [columnDisplay, setColumnDisplay] = useState(false);
     const [scrollHeight, setScrollHeight] = useState('350px');
+    const [configuredCondition, setSelectedConfiguredCondition] = useState([]);
 
     const engine = useDataEngine();
 
@@ -173,7 +174,8 @@ const ConfigurationComponent = () => {
                 setParticipantsProgram(entry.value.participantsProgram);
                 setTrainingProgram(entry.value.trainingProgram);
                 setActiveStage(entry.value.activeStage);
-                setEventNameAttribute(entry.value.eventNameAttribute)
+                setEventNameAttribute(entry.value.eventNameAttribute);
+                setSelectedConfiguredCondition(entry.value.configuredCondition || []);
                 const exists = keyExists;
                 exists[`${config.dataStoreKey}`] = true;
                 setKeyExists(exists);
@@ -235,7 +237,8 @@ const ConfigurationComponent = () => {
             trainingAttributes,
             activeStage,
             eventNameAttribute,
-            eventLocationAttribute
+            eventLocationAttribute,
+            configuredCondition
         }
         value[type] = data;
 
@@ -404,11 +407,11 @@ const ConfigurationComponent = () => {
                                     />
                                 </div>
                             </div>*/}
-                            {selectedProgram &&
+                            {trainingProgram &&
                                 <div className="shadow-sm rounded-md p-4 border border-blue-100 bg-white">
                                     <label htmlFor="program"
                                            className="block mb-2 text-sm font-semibold text-gray-900 ">
-                                        {i18n.t('Configure Data Elements')}
+                                        {i18n.t('Configure Event attributes')}
                                     </label>
                                     <div className="shadow-md rounded-md p-4 bg-white mb-4">
                                         <label htmlFor="program"
@@ -493,6 +496,8 @@ const ConfigurationComponent = () => {
                                                 caption={'Select data Elements the will be visible for the selected stage when attending to participants'}
                                                 selectedStage={selectedStage}
                                                 checkDataElements={selectedIndividualDataElements}
+                                                configuredCondition={configuredCondition}
+                                                setSelectedConfiguredCondition={setSelectedConfiguredCondition}
                                                 onSelectAll={(checked) => {
                                                     if (checked) {
                                                         setSelectedIndividualDataElements(dataElements.map(de => de.id))
