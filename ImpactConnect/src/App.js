@@ -1,31 +1,49 @@
-import { useDataQuery } from '@dhis2/app-runtime'
-import i18n from '@dhis2/d2-i18n'
-import React from 'react'
-import classes from './App.module.css'
+import React from 'react';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import ConfigurationComponent from './components/ConfigurationComponent.js';
+import { EventsComponent } from './components/EventsComponent.js';
+import { Main } from './components/main/Main.js';
+import { footerText } from './consts.js';
+import SetupStateProvider from './SetupStateProvider.js';
+import './index.css';
 
-const query = {
-    me: {
-        resource: 'me',
-    },
-}
+const MyApp = () => (
+    <SetupStateProvider>
+        <HashRouter>
+            <div>
+                <div className="w-full bg-white">
+                    <Routes>
+                        <Route
+                            exact
+                            path="/"
+                            element={<Main/>}
+                        />
+                        <Route
+                            configure
+                            exact
+                            path="/configure"
+                            element={<ConfigurationComponent/>}
+                        />
+                        <Route
+                            configure
+                            exact
+                            path="/events"
+                            element={<EventsComponent/>}
+                        />
+                        {/* defaulting if unmatched */}
+                        <Route path="*" element={<Navigate to="/" replace/>}/>
+                    </Routes>
+                </div>
 
-const MyApp = () => {
-    const { error, loading, data } = useDataQuery(query)
-
-    if (error) {
-        return <span>{i18n.t('ERROR')}</span>
-    }
-
-    if (loading) {
-        return <span>{i18n.t('Loading...')}</span>
-    }
-
-    return (
-        <div className={classes.container}>
-            <h1>{i18n.t('Hello {{name}}', { name: data.me.name })}</h1>
-            <h3>{i18n.t('Welcome to DHIS2!')}</h3>
-        </div>
-    )
-}
+                <footer>
+                    <div className="flex flex-col items-center">
+                        {/*{customImage('logo')}*/}
+                        <p className="mx-auto font-semibold">{footerText}</p>
+                    </div>
+                </footer>
+            </div>
+        </HashRouter>
+    </SetupStateProvider>
+)
 
 export default MyApp
