@@ -8,6 +8,7 @@ import { ConfiguredDataElements } from './ConfiguredDataElements.js';
 import { ConfiguredStagesComponent } from './ConfiguredStagesComponent.js';
 import { DataElementSortComponent } from './DataElementSortComponent.js';
 import { Navigation } from './Navigation.js';
+import NotFoundPage from './NotFoundPage.js';
 import ProgramComponent from './ProgramComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
 
@@ -17,7 +18,13 @@ const ConfigurationComponent = () => {
     const {
         selectedSharedProgram,
         setSelectedSharedProgram,
+        selectedSharedIsAdmin
     } = sharedState;
+
+    if (!selectedSharedIsAdmin) {
+        // Render the 404 page if the user doesn't have permission
+        return <NotFoundPage />;
+    }
 
     const [keyExists, setKeyExists] = useState({});
     const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
