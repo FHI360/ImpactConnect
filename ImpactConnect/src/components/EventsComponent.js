@@ -3,8 +3,8 @@ import i18n from '@dhis2/d2-i18n';
 import { Modal, ModalActions, ModalContent, ModalTitle, Pagination, Transfer } from '@dhis2/ui';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { config, EVENT_OPTIONS, REPORT } from '../consts.js';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS, REPORT } from '../consts.js';
 import {
     daysBetween,
     fetchEntities,
@@ -13,12 +13,14 @@ import {
     isObjectEmpty,
     paginate,
     searchEntities,
+    SharedStateContext,
     sortEntities,
     trackerCreate,
     trackerDelete
 } from '../utils.js';
 import { DataElementsComponent } from './DataElementsComponent.js';
 import { Navigation } from './Navigation.js';
+import NotFoundPage from './NotFoundPage.js';
 import OrganisationUnitComponent from './OrganisationUnitComponent.js';
 import { SearchComponent } from './SearchComponent.js';
 import { SpinnerComponent } from './SpinnerComponent.js';
@@ -26,9 +28,19 @@ import { VenueComponent } from './VenueComponent.js';
 
 export const EventsComponent = () => {
     const engine = useDataEngine();
+    const sharedState = useContext(SharedStateContext)
+
+    const {
+        selectedSharedIsMEL
+    } = sharedState;
+
+    if (!selectedSharedIsMEL) {
+        return <NotFoundPage/>;
+    }
 
     const [selectedVenue, setSelectedVenue] = useState('');
     const [trainings, setTrainings] = useState([]);
+    const [allTrainings, setAllTrainings] = useState([]);
     const [selectedTraining, setSelectedTraining] = useState('');
     const [entityType, setEntityType] = useState('');
     const [orgUnit, setOrgUnit] = useState('');
@@ -66,6 +78,11 @@ export const EventsComponent = () => {
     const [invalid, setInvalid] = useState(false);
     const [users, setUsers] = useState([]);
     const [facilitators, setFacilitators] = useState([]);
+    const [root, setRoot] = useState('');
+    const [retries, setRetries] = useState(0);
+    const [attributesChanged, setAttributesChanged] = useState(false);
+    const [stageDataElements, setStageDataElements] = useState([]);
+    const [success, setSuccess] = useState(false);
 
     const memoizedData = useMemo(() => {
         return {
@@ -83,6 +100,15 @@ export const EventsComponent = () => {
             resource: `dataStore/${config.dataStoreName}?fields=.`,
         }
     };
+
+    const userQuery = {
+        user: {
+            resource: 'me',
+            params: {
+                fields: 'organisationUnits(id)'
+            }
+        }
+    }
 
     const organisationsQuery = {
         orgUnits: {
@@ -122,7 +148,19 @@ export const EventsComponent = () => {
         }
     }
 
-    const {data: userData} = useDataQuery(usersQuery);
+    const dataElementsQuery = {
+        dataElements: {
+            resource: 'programStages',
+            params: {
+                paging: false,
+                fields: 'id,programStageDataElements(dataElement(id))'
+            }
+        }
+    }
+
+    const {data: dataElements} = useDataQuery(dataElementsQuery);
+
+    const {data: usersData} = useDataQuery(usersQuery);
 
     const {data: entityData, refetch} = useDataQuery(entitiesQuery, {
         variables: {
@@ -132,6 +170,8 @@ export const EventsComponent = () => {
             pageSize
         }
     });
+
+    const {data: userData} = useDataQuery(userQuery);
 
     const {data: orgUnitsData} = useDataQuery(organisationsQuery);
 
@@ -148,8 +188,27 @@ export const EventsComponent = () => {
     const {data: dataStore} = useDataQuery(dataStoreQuery);
 
     useEffect(() => {
-        if (userData && userData.users) {
-            const users = userData.users.users.map(user => {
+        if (userData?.user) {
+            setRoot(userData.user.organisationUnits[0].id);
+        }
+    }, [userData])
+
+    useEffect(() => {
+        if (dataElements) {
+            const data = dataElements.dataElements.programStages.map(ps => {
+                return {
+                    stage: ps.id,
+                    dataElements: ps.programStageDataElements.flatMap(psde => psde.dataElement.id)
+                }
+            })
+
+            setStageDataElements(data)
+        }
+    }, [dataElements]);
+
+    useEffect(() => {
+        if (usersData && usersData.users) {
+            const users = usersData.users.users.map(user => {
                 return {
                     value: user.username,
                     label: user.displayName
@@ -158,7 +217,39 @@ export const EventsComponent = () => {
             setUsers(users);
         }
 
-    }, [userData])
+    }, [usersData])
+
+    useEffect(() => {
+        if (trainingProgram && root) {
+
+            engine.query({
+                trainings: {
+                    resource: 'tracker/trackedEntities',
+                    params: {
+                        program: trainingProgram,
+                        ouMode: 'DESCENDANTS',
+                        paging: false,
+                        fields: '*',
+                        orgUnit: root
+                    }
+                }
+            }).then(res => {
+                if (res && res.trainings) {
+                    setAllTrainings(res.trainings.instances);
+                }
+            })
+        }
+
+    }, [trainingProgram, root])
+
+    useEffect(() => {
+        if (retries > 0) {
+            saveTraining();
+        } else if (saving && !success) {
+            show({msg: i18n.t('There was an error updating records'), type: 'error'});
+        }
+        setSaving(false);
+    }, [retries]);
 
     useEffect(() => {
         if (dataStore?.dataStore?.entries) {
@@ -212,6 +303,10 @@ export const EventsComponent = () => {
 
     useEffect(() => {
         pageParticipants(1, participantPageSize);
+
+        if (attributesChanged) {
+            updateAttributes();
+        }
     }, [participants]);
 
     useEffect(() => {
@@ -312,10 +407,14 @@ export const EventsComponent = () => {
     useEffect(() => {
         if (groupValues[EVENT_OPTIONS.attributes.startDate] && groupValues[EVENT_OPTIONS.attributes.endDate]) {
             if (new Date(groupValues[EVENT_OPTIONS.attributes.startDate]) > new Date(groupValues[EVENT_OPTIONS.attributes.endDate])) {
-                show({ msg: i18n.t('Start date cannot be after end date'), type: 'error' });
+                show({msg: i18n.t('Start date cannot be after end date'), type: 'error'});
             }
         }
     }, [groupValues]);
+
+    useEffect(() => {
+        setAttributesChanged(false);
+    }, [editMode]);
 
     const fetchEventAndTrainings = () => {
         fetchEvents().then(eventData => {
@@ -346,10 +445,10 @@ export const EventsComponent = () => {
     }
 
     const addSelection = () => {
-        const _participants = participants.filter(entity => !selectedEntities.find(participant => participant.trackedEntity
-            === entity.trackedEntity));
-        _participants.push(...selectedEntities);
-        setParticipants([..._participants]);
+        const selection = selectedEntities.filter(entity =>
+            !participants.some(participant => participant.trackedEntity === entity.trackedEntity)
+        );
+        setParticipants(prev => [...prev, ...selection]);
     }
 
     const groupDataElementValue = (attribute) => {
@@ -361,6 +460,15 @@ export const EventsComponent = () => {
             ...prevValues,
             [dataElement.id]: value,
         }));
+
+        if (editMode) {
+            if ([EVENT_OPTIONS.attributes.event, EVENT_OPTIONS.attributes.startDate, EVENT_OPTIONS.attributes.endDate, EVENT_OPTIONS.attributes.activity]
+                .includes(dataElement.id)) {
+                setAttributesChanged(true);
+            }
+        } else {
+            setAttributesChanged(false);
+        }
     }, []);
 
     const uniqueName = () => {
@@ -375,8 +483,11 @@ export const EventsComponent = () => {
 
     const saveTraining = async () => {
         if (!validateTraining()) {
-            return true;
+            return;
         }
+
+        setSuccess(false);
+
         let type = entityType;
         if (!type || type.length === 0) {
             const programData = await engine.query({
@@ -454,15 +565,18 @@ export const EventsComponent = () => {
             trackedEntities: [entity]
         });
         if (!response) {
-            show({msg: i18n.t('There was an error updating records'), type: 'error'});
-            setSaving(false);
+            setRetries(prev => {
+                if (prev === 0) {
+                    return 3;
+                }
+                return prev - 1;
+            })
         } else {
             if (response.TRACKED_ENTITY) {
                 trackedEntity = response?.TRACKED_ENTITY?.objectReports[0].uid;
             }
             if (trackedEntity) {
                 saveRelationships(trackedEntity).then(_ => {
-                    setSaving(false);
                     setEntities([]);
                     setSelectedTraining('');
                     fetchEvents().then(eventData => {
@@ -495,7 +609,19 @@ export const EventsComponent = () => {
                 }
             }
             show({msg: i18n.t('Event successfully updated'), type: 'success'});
+            setSuccess(true);
+            setSaving(false);
+            setRetries(0);
         }
+    }
+
+    const allParticipantsInTraining = () => {
+        return participants.every(participant => {
+            return participant.relationships?.some(rel => {
+                return rel.relationshipType === EVENT_OPTIONS.relationshipType &&
+                    rel.to.trackedEntity.trackedEntity === selectedTraining
+            })
+        })
     }
 
     const deleteEvent = async () => {
@@ -582,6 +708,17 @@ export const EventsComponent = () => {
         });
     }
 
+    const setVenue = (venue) => {
+        if (venue === 'Select Venue') {
+            venue = '';
+        }
+        setSelectedVenue(venue);
+        setParticipants([])
+        setGroupValues({})
+        setEvent(null)
+        setSelectedTraining('');
+    }
+
     const validateTraining = () => {
         return trainingAttributesData.every(ta => {
             const valueType = ta.valueType;
@@ -589,11 +726,7 @@ export const EventsComponent = () => {
                 return true;
             }
             if (ta.id === EVENT_OPTIONS.attributes.facilitators) {
-                if (facilitators.length === 0) {
-                    return false;
-                } else {
-                    return true;
-                }
+                return facilitators.length !== 0;
             }
             if (valueType === 'TRUE_ONLY' || valueType === 'BOOLEAN') {
                 return true;
@@ -630,8 +763,164 @@ export const EventsComponent = () => {
         }
     }
 
-    const renameOption = (oldName, newName) => {
+    const filterDataValues = (stage, dataValues) => {
+        const dataElements = stageDataElements.find(sde => sde.stage === stage)?.dataElements;
+        if (dataElements && dataElements.length) {
+            return dataValues.filter(dv => {
+                return dataElements.includes(dv.dataElement)
+            })
+        }
+        return dataValues;
+    }
 
+    const updateAttributes = async () => {
+        const training = events.find(evt => evt.trackedEntity === selectedTraining);
+        if (training) {
+            const activity = training.attributes.find(attr => attr.attribute === EVENT_OPTIONS.attributes.activity);
+            const name = training.attributes.find(attr => attr.attribute === EVENT_OPTIONS.attributes.event).value;
+
+            if (training && activity) {
+                let selectedStage = '';
+                switch (+activity.value) {
+                    case 1:
+                        selectedStage = ACTIVITY_STAGE_MAPPING[1];
+                        break;
+                    case 2:
+                        selectedStage = ACTIVITY_STAGE_MAPPING[2];
+                        break;
+                    case 3:
+                        selectedStage = ACTIVITY_STAGE_MAPPING[3];
+                        break;
+                    default:
+                        selectedStage = ACTIVITY_STAGE_MAPPING[1];
+                }
+                const nameAttribute = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage).mappings[EVENT_OPTIONS.attributes.event];
+                const attributes = Object.keys(groupValues).map(key => {
+                    const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+                    return {
+                        dataElement: mapping.mappings[key],
+                        value: groupValues[key]
+                    }
+                })
+
+                const attendees = training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
+                const values = await fetchEntities(engine, attendees, '*');
+                const modifiedParticipants = values.map(participant => {
+                    participant.entity.enrollments = participant.entity.enrollments.map(enrollment => {
+                        enrollment.events = enrollment.events.map(evt => {
+                            evt.dataValues = filterDataValues(evt.dataValues);
+                            const match = evt.dataValues?.some(d => {
+                                return d.dataElement === nameAttribute && d.value === name;
+
+                            })
+                            if (match) {
+                                attributes.forEach(de => {
+                                    const dataValue = evt.dataValues.find(dv => dv.dataElement === de.dataElement) || {};
+                                    dataValue.dataElement = de.dataElement;
+                                    dataValue.value = de.value;
+
+                                    const dataValues = evt.dataValues.filter(dv => dv.dataElement !== de.dataElement) || [];
+                                    dataValues.push(dataValue);
+                                    evt.dataValues = dataValues;
+                                })
+                            }
+
+                            return evt;
+                        });
+                        return enrollment;
+                    })
+                    return participant.entity;
+                });
+
+                setSaving(true);
+                trackerCreate(engine, {
+                    trackedEntities: modifiedParticipants
+                }).then(_ => setSaving(false))
+            }
+        }
+    }
+
+    const renameOption = async (oldName, newName) => {
+        const splitUniqueName = (uniqueName) => {
+            // Use a regular expression to split the string at the last two underscores
+            const lastUnderscoresIndex = uniqueName.lastIndexOf('_');
+            const secondLastUnderscoresIndex = uniqueName.lastIndexOf('_', lastUnderscoresIndex - 1);
+
+            if (lastUnderscoresIndex === -1 || secondLastUnderscoresIndex === -1) {
+                console.error('Invalid format: Unique name must include name_startdate_enddate');
+            }
+
+            // Extract the parts
+            const namePart = uniqueName.substring(0, secondLastUnderscoresIndex);
+            const datePart = uniqueName.substring(secondLastUnderscoresIndex + 1);
+
+            return {name: namePart, dates: datePart};
+        }
+        const trainings = allTrainings.filter(training => {
+            const uniqueName = training.attributes?.find(attr => attr.attribute === EVENT_OPTIONS.attributes.uniqueName);
+            return uniqueName && splitUniqueName(uniqueName.value)?.name === oldName;
+        });
+
+        const attendees = trainings.flatMap(training => {
+            return {
+                entities: training.relationships.map(rel => rel.from.trackedEntity.trackedEntity),
+                uniqueName: training.attributes.find(attr => attr.attribute === EVENT_OPTIONS.attributes.uniqueName)?.value
+            }
+        });
+
+        const renamedTrainings = trainings.map(training => {
+            return ({
+                ...training,
+                ['attributes']: training.attributes.map(attr => {
+                    if (attr.attribute === EVENT_OPTIONS.attributes.uniqueName) {
+                        attr.value = `${newName}_${splitUniqueName(attr.value).dates}`
+                    }
+                    return attr;
+                }),
+                ['enrollments']: training.enrollments.map(en => {
+                    en.attributes = en.attributes.map(attr => {
+                        if (attr.attribute === EVENT_OPTIONS.attributes.uniqueName) {
+                            attr.value = `${newName}_${splitUniqueName(attr.value).dates}`
+                        }
+                        return attr;
+                    })
+                    return en;
+                })
+            });
+        });
+
+        if (attendees.length > 0) {
+            const distinct = new Set(attendees.flatMap(a => a.entities));
+            const values = await fetchEntities(engine, Array.from(distinct), '*');
+            const modifiedParticipants = values.map(participant => {
+                participant.entity.enrollments = participant.entity.enrollments.map(enrollment => {
+                    enrollment.events = enrollment.events.map(evt => {
+                        evt.dataValues = filterDataValues(evt.dataValues);
+
+                        const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === evt.programStage);
+                        const uniqueName = mapping.mappings[EVENT_OPTIONS.attributes.uniqueName];
+                        const mappings = attendees.filter(m => m.entities.includes(participant.entity.trackedEntity));
+                        mappings.forEach(m => {
+                            evt.dataValues = evt.dataValues.map(attr => {
+                                if (attr.dataElement === uniqueName && m.uniqueName === attr.value) {
+                                    attr.value = `${newName}_${splitUniqueName(attr.value).dates}`
+                                }
+                                return attr;
+                            });
+                        })
+                        return evt;
+                    });
+                    return enrollment;
+                })
+                return participant.entity;
+            });
+            renamedTrainings.push(...modifiedParticipants);
+        }
+
+        setSaving(true);
+        trackerCreate(engine, {
+            trackedEntities: renamedTrainings
+        }).then(_ => setSaving(false))
     }
 
     const retrySave = async (callback, times = 3) => {
@@ -689,6 +978,7 @@ export const EventsComponent = () => {
         );
         worksheet.columns = [
             {header: 'Name of Participant', key: 'name', width: 50},
+            {header: 'Participant TEID', key: 'teid', width: 50},
             {header: 'Gender', key: 'gender', width: 10},
             {header: 'Do you have any type of disability? Yes/No', key: 'disability', width: 10,},
             {header: 'School', key: 'school', width: 30},
@@ -701,6 +991,7 @@ export const EventsComponent = () => {
             return {
                 school: orgUnits.find(ou => ou.id === participant.orgUnit)?.displayName,
                 name: getParticipant(participant, nameAttributes),
+                teid: participant.trackedEntity,
                 phone: getAttribute(participant, REPORT.PHONE),
                 gender: getAttribute(participant, REPORT.GENDER) === '1' ? 'M' : 'F',
                 position: getAttribute(participant, REPORT.POSITION)
@@ -738,7 +1029,7 @@ export const EventsComponent = () => {
                                                         </label>
                                                     </div>
                                                     <VenueComponent
-                                                        venueSelected={(venue) => setSelectedVenue(venue)}/>
+                                                        venueSelected={(venue) => setVenue(venue)}/>
                                                 </div>
                                                 {selectedVenue &&
                                                     <div
@@ -800,13 +1091,6 @@ export const EventsComponent = () => {
                                                                     }
                                                                     <button type="button"
                                                                             onClick={() => {
-                                                                                /*retrySave(saveTraining)
-                                                                                    .then(() => {
-                                                                                        console.log('Training saved successfully after retries');
-                                                                                    })
-                                                                                    .catch(err => {
-                                                                                        console.error('Failed to save training:', err);
-                                                                                    });*/
                                                                                 saveTraining()
                                                                             }}
                                                                             disabled={saving || loading || !validateTraining() || invalid}
@@ -902,13 +1186,6 @@ export const EventsComponent = () => {
                                                                     }
                                                                     <button type="button"
                                                                             onClick={() => {
-                                                                                /*retrySave(saveTraining)
-                                                                                    .then(() => {
-                                                                                        console.log('Training saved successfully after retries');
-                                                                                    })
-                                                                                    .catch(err => {
-                                                                                        console.error('Failed to save training:', err);
-                                                                                    });*/
                                                                                 saveTraining();
                                                                             }}
                                                                             disabled={saving || loading || !validateTraining() || invalid}
@@ -939,8 +1216,8 @@ export const EventsComponent = () => {
                                                     {loading &&
                                                         <SpinnerComponent/>
                                                     }
-                                                    {/*<div className="flex flex-row justify-end">
-                                                        {participants.length > 0 &&
+                                                    <div className="flex flex-row justify-end">
+                                                        {participants.length > 0 && allParticipantsInTraining() &&
                                                             <button type="button"
                                                                     onClick={downloadAttendance}
                                                                     className="primary-btn"
@@ -948,7 +1225,7 @@ export const EventsComponent = () => {
                                                                 Download attendance
                                                             </button>
                                                         }
-                                                    </div>*/}
+                                                    </div>
                                                     <table
                                                         className="w-full text-sm text-left rtl:text-right text-gray-500 ">
                                                         <caption

@@ -1,8 +1,15 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
-import React, { useEffect, useState } from 'react';
-import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS, MEL_TEAM } from '../../consts.js';
+import React, { useContext, useEffect, useState } from 'react';
+import {
+    ACTIVITY_STAGE_MAPPING,
+    APP_GROUP,
+    config,
+    EVENT_OPTIONS,
+    FACILITATOR_GROUP,
+    MEL_TEAM_GROUP
+} from '../../consts.js';
 import {
     daysBetween,
     fetchEntities,
@@ -10,6 +17,7 @@ import {
     isObjectEmpty,
     paginate,
     searchEntities,
+    SharedStateContext,
     sortEntities,
     trackerCreate
 } from '../../utils.js';
@@ -18,9 +26,20 @@ import { Navigation } from '../Navigation.js';
 import { SearchComponent } from '../SearchComponent.js';
 import { SpinnerComponent } from '../SpinnerComponent.js';
 import { TrainingsComponent } from '../TrainingsComponent.js';
+import NotFoundPage from '../NotFoundPage';
 
 export const Main = () => {
     const engine = useDataEngine();
+
+    const sharedState = useContext(SharedStateContext)
+
+    const {
+        setSelectedIsAdmin,
+        setSelectedIsMEL,
+        setSelectedIsFacilitator,
+        selectedSharedIsMEL,
+        selectedSharedIsFacilitator
+    } = sharedState;
 
     const [dataElements, setDataElements] = useState([]);
     const [trainingProgram, setTrainingProgram] = useState('');
@@ -68,7 +87,7 @@ export const Main = () => {
         user: {
             resource: 'me',
             params: {
-                fields: 'username, organisationUnits(id, root), userGroups(id, displayName)'
+                fields: 'username, organisationUnits(id, root), userGroups(id, displayName, name)'
             }
         }
     }
@@ -107,6 +126,16 @@ export const Main = () => {
             setRoot(userData.user.organisationUnits[0].id);
             setUser(userData.user.username);
             setGroups(userData.user.userGroups.map(ug => ug.displayName));
+
+            const userGroupsMemberships = userData.user.userGroups
+            if (userGroupsMemberships.length > 0) {
+                const isAdmin = userGroupsMemberships.some(member => APP_GROUP === member.name);
+                setSelectedIsAdmin(isAdmin);
+                const isFacilitator = userGroupsMemberships.some(member => FACILITATOR_GROUP === member.name);
+                setSelectedIsFacilitator(isFacilitator);
+                const isMEL = userGroupsMemberships.some(member => APP_GROUP === member.name);
+                setSelectedIsMEL(isMEL);
+            }
         }
     }, [userData])
 
@@ -160,7 +189,7 @@ export const Main = () => {
                             const facilitators = attr.attribute === EVENT_OPTIONS.attributes.facilitators && attr.value;
                             return facilitators && facilitators.split(',').includes(user);
                         });
-                        if (groups.includes(MEL_TEAM)) {
+                        if (groups.includes(MEL_TEAM_GROUP)) {
                             return true;
                         }
                         return facilitatorMatches;
@@ -454,6 +483,7 @@ export const Main = () => {
                     setAllEntities(attendees);
                     setEntities(attendees);
                     setSaving(false);
+                    setPage(0);
                 });
                 show({msg: i18n.t('Attendance successfully updated'), type: 'success'});
             } else {
@@ -565,7 +595,7 @@ export const Main = () => {
         }
     }
 
-    return (
+    return (!(selectedSharedIsMEL || selectedSharedIsFacilitator) ? <NotFoundPage/> : (
         <>
             <div className="flex flex-row w-full h-full">
                 <div className="page">
@@ -814,5 +844,5 @@ export const Main = () => {
                 </div>
             </div>
         </>
-    )
+    ))
 }

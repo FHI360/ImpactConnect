@@ -125,6 +125,7 @@ export const VenueComponent = ({
                                 setLevel5OrgUnits([]);
                                 updateOrgUnits(5, selected);
                                 setSelectedLevel4(selected);
+                                setSelectedLevel5('')
                             }}>
                         {loading && level4OrgUnits.length === 0 ? (
                             <option>Loading...</option>
