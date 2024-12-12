@@ -8,6 +8,7 @@ import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS, REPORT } from '../consts
 import {
     daysBetween,
     fetchEntities,
+    filterDataValues,
     getAttribute,
     getParticipant,
     isObjectEmpty,
@@ -763,14 +764,9 @@ export const EventsComponent = () => {
         }
     }
 
-    const filterDataValues = (stage, dataValues) => {
+    const filterDataValuesInStage = (stage, dataValues) => {
         const dataElements = stageDataElements.find(sde => sde.stage === stage)?.dataElements;
-        if (dataElements && dataElements.length) {
-            return dataValues.filter(dv => {
-                return dataElements.includes(dv.dataElement)
-            })
-        }
-        return dataValues;
+        return filterDataValues(dataElements, dataValues);
     }
 
     const updateAttributes = async () => {
@@ -808,7 +804,7 @@ export const EventsComponent = () => {
                 const modifiedParticipants = values.map(participant => {
                     participant.entity.enrollments = participant.entity.enrollments.map(enrollment => {
                         enrollment.events = enrollment.events.map(evt => {
-                            evt.dataValues = filterDataValues(evt.dataValues);
+                            evt.dataValues = filterDataValuesInStage(evt.dataValues);
                             const match = evt.dataValues?.some(d => {
                                 return d.dataElement === nameAttribute && d.value === name;
 
@@ -895,7 +891,7 @@ export const EventsComponent = () => {
             const modifiedParticipants = values.map(participant => {
                 participant.entity.enrollments = participant.entity.enrollments.map(enrollment => {
                     enrollment.events = enrollment.events.map(evt => {
-                        evt.dataValues = filterDataValues(evt.dataValues);
+                        evt.dataValues = filterDataValuesInStage(evt.dataValues);
 
                         const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === evt.programStage);
                         const uniqueName = mapping.mappings[EVENT_OPTIONS.attributes.uniqueName];
