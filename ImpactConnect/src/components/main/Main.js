@@ -12,7 +12,7 @@ import {
 } from '../../consts.js';
 import {
     daysBetween,
-    fetchEntities,
+    fetchEntities, filterDataValues,
     getParticipant,
     isObjectEmpty,
     paginate,
@@ -23,10 +23,10 @@ import {
 } from '../../utils.js';
 import { DataElementComponent } from '../DataElement.js';
 import { Navigation } from '../Navigation.js';
+import NotFoundPage from '../NotFoundPage.js';
 import { SearchComponent } from '../SearchComponent.js';
 import { SpinnerComponent } from '../SpinnerComponent.js';
 import { TrainingsComponent } from '../TrainingsComponent.js';
-import NotFoundPage from '../NotFoundPage';
 
 export const Main = () => {
     const engine = useDataEngine();
@@ -71,6 +71,7 @@ export const Main = () => {
     const [root, setRoot] = useState('');
     const [groups, setGroups] = useState([]);
     const [venue, setVenue] = useState('');
+    const [stageDataElements, setStageDataElements] = useState([]);
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -111,6 +112,16 @@ export const Main = () => {
         }
     }
 
+    const stageDataElementsQuery = {
+        dataElements: {
+            resource: 'programStages',
+            params: {
+                paging: false,
+                fields: 'id,programStageDataElements(dataElement(id))'
+            }
+        }
+    }
+
     const {
         data: elementsData
     } = useDataQuery(dataElementsQuery);
@@ -120,6 +131,8 @@ export const Main = () => {
     const {data: orgUnitsData} = useDataQuery(organisationsQuery);
 
     const {data: userData} = useDataQuery(userQuery);
+
+    const {data: stagesDataElements} = useDataQuery(stageDataElementsQuery);
 
     useEffect(() => {
         if (userData?.user) {
@@ -166,6 +179,18 @@ export const Main = () => {
         setOriginalEdits([]);
         setEdits([]);
     }, [elementsData]);
+
+    useEffect(() => {
+        if (stagesDataElements) {
+            const data = stagesDataElements.dataElements.programStages.map(ps => {
+                return {
+                    stage: ps.id,
+                    dataElements: ps.programStageDataElements.flatMap(psde => psde.dataElement.id)
+                }
+            })
+            setStageDataElements(data)
+        }
+    }, [stagesDataElements]);
 
     useEffect(() => {
         if (trainingProgram && root) {
@@ -390,6 +415,7 @@ export const Main = () => {
             })
         }
 
+        const dataElements = stageDataElements.find(sde => sde.stage === selectedStage)?.dataElements;
         const repeatable = stages.find(stage => stage.id === selectedStage)?.repeatable;
 
         //Loop through each edit records and recreate event data for
@@ -403,6 +429,7 @@ export const Main = () => {
                     const existingEvent = edit.entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
                     if (existingEvent && !repeatable) {
                         event = existingEvent;
+                        event.dataValues = filterDataValues(dataElements, event.dataValues);
                     } else {
                         event = {
                             programStage: selectedStage,
@@ -468,7 +495,7 @@ export const Main = () => {
 
                     const dataValues = event.dataValues.filter(dv => dv.dataElement !== de.dataElement) || [];
                     dataValues.push(dataValue);
-                    event.dataValues = dataValues;
+                    event.dataValues = filterDataValues(dataElements, dataValues);
                 })
 
                 events.push(event);
