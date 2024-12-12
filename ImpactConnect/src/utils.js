@@ -585,3 +585,12 @@ export const applyAssignAction = (conditions, stage, dataElement, values) => {
         value: ''
     }
 }
+
+export const filterDataValues = (dataElements, dataValues) => {
+    if (dataElements && dataElements.length) {
+        return dataValues.filter(dv => {
+            return dataElements.includes(dv.dataElement)
+        })
+    }
+    return dataValues;
+}
