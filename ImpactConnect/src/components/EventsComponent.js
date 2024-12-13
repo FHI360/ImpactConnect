@@ -4,7 +4,15 @@ import { Modal, ModalActions, ModalContent, ModalTitle, Pagination, Transfer } f
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS, REPORT } from '../consts.js';
+import {
+    ACTIVITY_STAGE_MAPPING,
+    APP_GROUP,
+    config,
+    EVENT_OPTIONS,
+    FACILITATOR_GROUP,
+    MEL_TEAM_GROUP,
+    REPORT
+} from '../consts.js';
 import {
     daysBetween,
     fetchEntities,
@@ -32,10 +40,14 @@ export const EventsComponent = () => {
     const sharedState = useContext(SharedStateContext)
 
     const {
-        selectedSharedIsMEL
+        selectedSharedIsMEL,
+        selectedSharedIsAdmin,
+        setSelectedIsAdmin,
+        setSelectedIsMEL,
+        setSelectedIsFacilitator,
     } = sharedState;
 
-    if (!selectedSharedIsMEL) {
+    if (!(selectedSharedIsMEL || selectedSharedIsAdmin)) {
         return <NotFoundPage/>;
     }
 
@@ -81,7 +93,6 @@ export const EventsComponent = () => {
     const [facilitators, setFacilitators] = useState([]);
     const [root, setRoot] = useState('');
     const [retries, setRetries] = useState(0);
-    const [attributesChanged, setAttributesChanged] = useState(false);
     const [stageDataElements, setStageDataElements] = useState([]);
     const [success, setSuccess] = useState(false);
 
@@ -106,7 +117,7 @@ export const EventsComponent = () => {
         user: {
             resource: 'me',
             params: {
-                fields: 'organisationUnits(id)'
+                fields: 'username, organisationUnits(id, root), userGroups(id, displayName, name)'
             }
         }
     }
@@ -140,10 +151,10 @@ export const EventsComponent = () => {
 
     const usersQuery = {
         users: {
-            resource: 'users',
+            resource: 'userGroups',
             params: {
                 paging: false,
-                fields: ['username', 'displayName'],
+                fields: 'name,users(name,username)',
                 order: 'displayName'
             }
         }
@@ -191,6 +202,15 @@ export const EventsComponent = () => {
     useEffect(() => {
         if (userData?.user) {
             setRoot(userData.user.organisationUnits[0].id);
+            const userGroupsMemberships = userData.user.userGroups
+            if (userGroupsMemberships.length > 0) {
+                const isAdmin = userGroupsMemberships.some(member => APP_GROUP === member.name);
+                setSelectedIsAdmin(isAdmin);
+                const isFacilitator = userGroupsMemberships.some(member => FACILITATOR_GROUP === member.name);
+                setSelectedIsFacilitator(isFacilitator);
+                const isMEL = userGroupsMemberships.some(member => MEL_TEAM_GROUP === member.name);
+                setSelectedIsMEL(isMEL);
+            }
         }
     }, [userData])
 
@@ -209,12 +229,15 @@ export const EventsComponent = () => {
 
     useEffect(() => {
         if (usersData && usersData.users) {
-            const users = usersData.users.users.map(user => {
-                return {
-                    value: user.username,
-                    label: user.displayName
-                }
-            });
+            const users = usersData.users.userGroups.filter(g => g.name === FACILITATOR_GROUP).flatMap(group => {
+                return group.users.map(user => {
+                    return {
+                        value: user.username,
+                        label: user.displayName
+                    }
+                })
+            }).sort((u1, u2) => u1.label.localeCompare(u2.label));
+
             setUsers(users);
         }
 
@@ -304,10 +327,6 @@ export const EventsComponent = () => {
 
     useEffect(() => {
         pageParticipants(1, participantPageSize);
-
-        if (attributesChanged) {
-            updateAttributes();
-        }
     }, [participants]);
 
     useEffect(() => {
@@ -377,7 +396,7 @@ export const EventsComponent = () => {
             fetchEntities(engine, [selectedTraining], '*').then(value => {
                 const trainings = value.map(v => v.entity);
                 if (trainings && trainings.length) {
-                    setEvent(trainings[0])
+                    setEvent(trainings[0]);
                 }
             });
         }
@@ -412,10 +431,6 @@ export const EventsComponent = () => {
             }
         }
     }, [groupValues]);
-
-    useEffect(() => {
-        setAttributesChanged(false);
-    }, [editMode]);
 
     const fetchEventAndTrainings = () => {
         fetchEvents().then(eventData => {
@@ -461,15 +476,6 @@ export const EventsComponent = () => {
             ...prevValues,
             [dataElement.id]: value,
         }));
-
-        if (editMode) {
-            if ([EVENT_OPTIONS.attributes.event, EVENT_OPTIONS.attributes.startDate, EVENT_OPTIONS.attributes.endDate, EVENT_OPTIONS.attributes.activity]
-                .includes(dataElement.id)) {
-                setAttributesChanged(true);
-            }
-        } else {
-            setAttributesChanged(false);
-        }
     }, []);
 
     const uniqueName = () => {
@@ -502,7 +508,7 @@ export const EventsComponent = () => {
             });
             type = programData.programs.programs.find(p => p.id === trainingProgram)?.trackedEntityType.id;
         }
-        const attributes = trainingAttributes.map(attr => {
+        let attributes = trainingAttributes.map(attr => {
             const valueType = trainingAttributesData.find(ta => ta.id === attr).valueType;
             let value = groupDataElementValue(attr);
 
@@ -526,6 +532,7 @@ export const EventsComponent = () => {
             }
         });
 
+        attributes = attributes.filter(attr => !(attr.attribute === EVENT_OPTIONS.attributes.days || attr.attribute === EVENT_OPTIONS.attributes.facilitators))
         attributes.push({
             attribute: EVENT_OPTIONS.attributes.days,
             value: daysBetween(new Date(groupDataElementValue(EVENT_OPTIONS.attributes.startDate)), new Date(groupDataElementValue(EVENT_OPTIONS.attributes.endDate)))
@@ -605,6 +612,8 @@ export const EventsComponent = () => {
                         fetchEntities(engine, ids, 'trackedEntity,orgUnit,attributes,relationships').then(value => {
                             const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
                             setParticipants(attendees);
+
+                            updateAttributes();
                         });
                     }
                 }
@@ -766,7 +775,7 @@ export const EventsComponent = () => {
 
     const filterDataValuesInStage = (stage, dataValues) => {
         const dataElements = stageDataElements.find(sde => sde.stage === stage)?.dataElements;
-        return filterDataValues(dataElements, dataValues);
+        return filterDataValues(dataElements, dataValues).filter(dv => dv.dataElement && dv.dataElement.length > 0);
     }
 
     const updateAttributes = async () => {
@@ -793,18 +802,23 @@ export const EventsComponent = () => {
                 const nameAttribute = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage).mappings[EVENT_OPTIONS.attributes.event];
                 const attributes = Object.keys(groupValues).map(key => {
                     const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+                    if (key === EVENT_OPTIONS.attributes.days) {
+                        return {
+                            dataElement: mapping.mappings[key],
+                            value: daysBetween(new Date(groupDataElementValue(EVENT_OPTIONS.attributes.startDate)), new Date(groupDataElementValue(EVENT_OPTIONS.attributes.endDate)))
+                        }
+                    }
                     return {
                         dataElement: mapping.mappings[key],
                         value: groupValues[key]
                     }
-                })
+                });
 
                 const attendees = training.relationships.map(rel => rel.from.trackedEntity.trackedEntity);
                 const values = await fetchEntities(engine, attendees, '*');
                 const modifiedParticipants = values.map(participant => {
                     participant.entity.enrollments = participant.entity.enrollments.map(enrollment => {
                         enrollment.events = enrollment.events.map(evt => {
-                            evt.dataValues = filterDataValuesInStage(evt.dataValues);
                             const match = evt.dataValues?.some(d => {
                                 return d.dataElement === nameAttribute && d.value === name;
 
@@ -820,6 +834,7 @@ export const EventsComponent = () => {
                                     evt.dataValues = dataValues;
                                 })
                             }
+                            evt.dataValues = filterDataValuesInStage(evt.programStage, evt.dataValues);
 
                             return evt;
                         });
@@ -891,7 +906,7 @@ export const EventsComponent = () => {
             const modifiedParticipants = values.map(participant => {
                 participant.entity.enrollments = participant.entity.enrollments.map(enrollment => {
                     enrollment.events = enrollment.events.map(evt => {
-                        evt.dataValues = filterDataValuesInStage(evt.dataValues);
+                        evt.dataValues = filterDataValuesInStage(evt.programStage, evt.dataValues);
 
                         const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === evt.programStage);
                         const uniqueName = mapping.mappings[EVENT_OPTIONS.attributes.uniqueName];
@@ -903,7 +918,8 @@ export const EventsComponent = () => {
                                 }
                                 return attr;
                             });
-                        })
+                        });
+                        evt.dataValues = filterDataValuesInStage(evt.programStage, evt.dataValues);
                         return evt;
                     });
                     return enrollment;
@@ -918,49 +934,6 @@ export const EventsComponent = () => {
             trackedEntities: renamedTrainings
         }).then(_ => setSaving(false))
     }
-
-    const retrySave = async (callback, times = 3) => {
-        let numberOfTries = 0;
-        let isResolved = false; // Track whether the callback succeeded
-
-        return new Promise((resolve, reject) => {
-            const attempt = async () => {
-                if (isResolved || numberOfTries >= times) {
-                    return; // Stop if already resolved or maximum attempts reached
-                }
-
-                numberOfTries++;
-
-                try {
-                    await callback(); // Attempt the callback
-                    isResolved = true; // Mark as resolved
-                    resolve(); // Resolve the promise on success
-                } catch (err) {
-                    if (numberOfTries >= times) {
-                        show({msg: i18n.t('There was an error updating records'), type: 'error'});
-                        setSaving(false);
-                        reject(err); // Reject the promise if all retries fail
-                    } else {
-                        console.log(`Retrying... Attempt ${numberOfTries} of ${times}`);
-                    }
-                }
-            };
-
-            // Run the attempt function at regular intervals
-            const interval = setInterval(() => {
-                if (isResolved) {
-                    clearInterval(interval); // Stop the interval if resolved
-                } else {
-                    attempt().catch(err => console.error('Unexpected error in retry logic:', err));
-                }
-            }, 2500);
-
-            // Ensure the interval is cleared if the promise resolves or rejects
-            resolve().finally(() => clearInterval(interval));
-            reject().finally(() => clearInterval(interval));
-        });
-    };
-
 
     const downloadAttendance = async () => {
         const workbook = new ExcelJS.Workbook();
@@ -1147,6 +1120,7 @@ export const EventsComponent = () => {
                                                                             </label>
                                                                             <Transfer options={users}
                                                                                       selected={facilitators}
+                                                                                      filterable={true}
                                                                                       leftHeader={<div
                                                                                           className="p-2 font-semibold">Available
                                                                                           Users</div>}
