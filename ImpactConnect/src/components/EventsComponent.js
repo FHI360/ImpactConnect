@@ -1108,6 +1108,7 @@ export const EventsComponent = () => {
                                                                     <>
                                                                         <DataElementsComponent data={memoizedData}
                                                                                                disable={disable}
+                                                                                               editOnly={editMode}
                                                                                                configuredCondition={configuredCondition}
                                                                                                setInvalid={(invalid) => setInvalid(invalid)}
                                                                                                setEditingOption={(editing) => setDisable(editing)}

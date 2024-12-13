@@ -10,8 +10,10 @@ export const DataElementsComponent = React.memo(({
                                                      configuredCondition,
                                                      setInvalid,
                                                      values,
+                                                     editOnly,
                                                      stage,
-                                                     optionRenamed = (oldName, newName) => {}
+                                                     optionRenamed = (oldName, newName) => {
+                                                     }
                                                  }) => {
     return (
         <>
@@ -30,6 +32,7 @@ export const DataElementsComponent = React.memo(({
                                                   values={values}
                                                   setInvalid={setInvalid}
                                                   stage={stage}
+                                                  editOnly={editOnly}
                                                   optionRenamed={optionRenamed}
                                                   valueChanged={valueChange}/>
                         </div>
@@ -44,6 +47,7 @@ DataElementsComponent.propTypes = {
     configuredCondition: PropTypes.array,
     data: PropTypes.object,
     disable: PropTypes.bool,
+    editOnly: PropTypes.bool,
     optionRenamed: PropTypes.func,
     setEditingOption: PropTypes.func,
     setInvalid: PropTypes.func,

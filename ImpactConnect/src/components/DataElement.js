@@ -19,10 +19,13 @@ export const DataElementComponent = ({
                                          stage,
                                          conditions,
                                          optionAdd = false,
+                                         editOnly = false,
                                          setEditingOption = (_) => {
                                          },
-                                         setInvalid = (valid) => {},
-                                         optionRenamed = (oldName, newName) => {}
+                                         setInvalid = (valid) => {
+                                         },
+                                         optionRenamed = (oldName, newName) => {
+                                         }
                                      }) => {
     const engine = useDataEngine();
 
@@ -259,7 +262,8 @@ export const DataElementComponent = ({
                     <div className="flex flex-col">
                         {labelVisible &&
                             <label className="label">
-                                {label || dataElement.name || dataElement.displayName} {dataElement?.id === EVENT_OPTIONS.attributes.event && <span className="required">*</span>}
+                                {label || dataElement.name || dataElement.displayName} {dataElement?.id === EVENT_OPTIONS.attributes.event &&
+                                <span className="required">*</span>}
                             </label>
                         }
                         <div className="flex flex-row">
@@ -286,17 +290,19 @@ export const DataElementComponent = ({
                             </select>
                             {!edit && !readonly && optionAdd && enabled &&
                                 <>
-                                    <div className="p-1" onClick={() => {
-                                        setEdit(true);
-                                        setSelectedValue('');
-                                        setRenameMode(false);
-                                        setEditingOption(true)
-                                    }}>
-                                        <button type="button"
-                                                className="primary-btn">
-                                            Add
-                                        </button>
-                                    </div>
+                                    {!editOnly &&
+                                        <div className="p-1" onClick={() => {
+                                            setEdit(true);
+                                            setSelectedValue('');
+                                            setRenameMode(false);
+                                            setEditingOption(true)
+                                        }}>
+                                            <button type="button"
+                                                    className="primary-btn">
+                                                Add
+                                            </button>
+                                        </div>
+                                    }
                                     {value && value !== 'Select one' &&
                                         <div className="p-2" onClick={() => {
                                             setEdit(true);
@@ -446,6 +452,7 @@ export const DataElementComponent = ({
 DataElementComponent.propTypes = {
     conditions: PropTypes.array,
     dataElement: PropTypes.object,
+    editOnly: PropTypes.bool,
     label: PropTypes.string,
     labelVisible: PropTypes.bool,
     optionAdd: PropTypes.bool,
