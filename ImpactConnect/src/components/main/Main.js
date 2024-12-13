@@ -643,7 +643,7 @@ export const Main = () => {
         }
     }
 
-    return (!(selectedSharedIsMEL || selectedSharedIsFacilitator) ? <NotFoundPage/> : (
+    return (!(selectedSharedIsMEL || selectedSharedIsFacilitator || selectedSharedIsAdmin) ? <NotFoundPage/> : (
         <>
             <div className="flex flex-row w-full h-full">
                 <div className="page">
