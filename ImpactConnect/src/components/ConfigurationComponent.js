@@ -2,12 +2,13 @@ import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Transfer } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
-import { config } from '../consts.js';
+import { APP_GROUP, config, FACILITATOR_GROUP, MEL_TEAM_GROUP } from '../consts.js';
 import { createOrUpdateDataStore, SharedStateContext } from '../utils.js';
 import { ConfiguredDataElements } from './ConfiguredDataElements.js';
 import { ConfiguredStagesComponent } from './ConfiguredStagesComponent.js';
 import { DataElementSortComponent } from './DataElementSortComponent.js';
 import { Navigation } from './Navigation.js';
+import NotFoundPage from './NotFoundPage.js';
 import ProgramComponent from './ProgramComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
 
@@ -17,7 +18,16 @@ const ConfigurationComponent = () => {
     const {
         selectedSharedProgram,
         setSelectedSharedProgram,
+        selectedSharedIsAdmin,
+        setSelectedIsAdmin,
+        setSelectedIsMEL,
+        setSelectedIsFacilitator,
     } = sharedState;
+
+    if (!selectedSharedIsAdmin) {
+        // Render the 404 page if the user doesn't have permission
+        return <NotFoundPage />;
+    }
 
     const [keyExists, setKeyExists] = useState({});
     const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
@@ -47,6 +57,15 @@ const ConfigurationComponent = () => {
     const [configuredCondition, setSelectedConfiguredCondition] = useState([]);
 
     const engine = useDataEngine();
+
+    const userQuery = {
+        user: {
+            resource: 'me',
+            params: {
+                fields: 'userGroups(id, displayName, name)'
+            }
+        }
+    }
 
     const dataStoreQuery = {
         dataStore: {
@@ -85,6 +104,8 @@ const ConfigurationComponent = () => {
         }
     }
 
+    const {data: userData} = useDataQuery(userQuery);
+
     const {data} = useDataQuery(query, {
         variables: {
             id: participantsProgram
@@ -109,6 +130,20 @@ const ConfigurationComponent = () => {
     } = useDataQuery(dataElementsQuery, {variables: {id: selectedStage}});
 
     const {data: dataStore} = useDataQuery(dataStoreQuery);
+
+    useEffect(() => {
+        if (userData?.user) {
+            const userGroupsMemberships = userData.user.userGroups
+            if (userGroupsMemberships.length > 0) {
+                const isAdmin = userGroupsMemberships.some(member => APP_GROUP === member.name);
+                setSelectedIsAdmin(isAdmin);
+                const isFacilitator = userGroupsMemberships.some(member => FACILITATOR_GROUP === member.name);
+                setSelectedIsFacilitator(isFacilitator);
+                const isMEL = userGroupsMemberships.some(member => MEL_TEAM_GROUP === member.name);
+                setSelectedIsMEL(isMEL);
+            }
+        }
+    }, [userData])
 
     useEffect(() => {
         if ((data?.programs?.programs || data?.programs?.programTrackedEntityAttributes) && participantsProgram) {

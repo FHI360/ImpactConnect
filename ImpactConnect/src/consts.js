@@ -28,7 +28,10 @@ export const project_description = 'This application resolves duplicate issues'
 export const panelAction = 'Finding duplicate tracked entities'
 
 export const VENUE_NAME = 'Training/Meeting/Workshop Venues';
-export const MEL_TEAM = 'MEL Team';
+export const MEL_TEAM_GROUP = 'MEL Team';
+export const FACILITATOR_GROUP = 'Facilitators';
+export const APP_GROUP = "ImpactConnectAdmins"
+
 export const TRAINING_STAGES = {
     TRAINING: 'SmUprI011oN',
     WORKSHOP: 'rPMeg1cK9Pu',

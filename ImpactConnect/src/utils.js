@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useState } from 'react';
 import classes from './App.module.css'
 import { config } from './consts.js';
+import padlock from './icons/padlock_resized.jpg';
 import refresh from './icons/refresh.png'
 import search from './icons/search.png'
 
@@ -13,6 +14,13 @@ export const customImage = (source, size = 'small') => {
     }
     if (source.toLowerCase() === 'refresh') {
         return <img src={refresh} className={iconClass}/>
+    }
+    if (source.toLowerCase() === '404') {
+        return <img
+            src={padlock}
+            alt="Access Denied"
+            className="w-24 h-24 mb-6" // Adjust size as needed
+        />
     }
 }
 
@@ -354,6 +362,15 @@ export const SharedStateContext = createContext({
     },
     selectedSharedStage: '',
     setSelectedSharedStage: () => {
+    },
+    selectedSharedIsAdmin: false,
+    setSelectedIsAdmin: () => {
+    },
+    selectedSharedIsFacilitator: false,
+    setSelectedIsFacilitator: () => {
+    },
+    selectedSharedIsMEL: false,
+    setSelectedIsMEL: () => {
     }
 })
 
@@ -362,6 +379,9 @@ export const useSharedState = () => {
     const [selectedSharedProgram, setSelectedSharedProgram_] = useState('');
     const [selectedSharedOrgUnit, setSelectedSharedOrgUnit_] = useState('');
     const [selectedSharedStage, setSelectedSharedStage_] = useState('');
+    const [selectedSharedIsAdmin, setSelectedIsAdmin_] = useState(false);
+    const [selectedSharedIsFacilitator, setSelectedIsFacilitator_] = useState(false);
+    const [selectedSharedIsMEL, setSelectedIsMEL_] = useState(false);
 
 
     // memoizedCallbacks
@@ -383,7 +403,15 @@ export const useSharedState = () => {
     const setSelectedSharedStage = useCallback((data) => {
         setSelectedSharedStage_(data)
     }, []);
-
+    const setSelectedIsAdmin = useCallback((data) => {
+        setSelectedIsAdmin_(data)
+    }, []);
+    const setSelectedIsFacilitator = useCallback((data) => {
+        setSelectedIsFacilitator_(data)
+    }, []);
+    const setSelectedIsMEL = useCallback((data) => {
+        setSelectedIsMEL_(data)
+    }, []);
 
     return {
         selectedSharedOU,
@@ -393,7 +421,13 @@ export const useSharedState = () => {
         selectedSharedOrgUnit,
         setSelectedSharedOrgUnit,
         selectedSharedStage,
-        setSelectedSharedStage
+        setSelectedSharedStage,
+        selectedSharedIsAdmin,
+        setSelectedIsAdmin,
+        selectedSharedIsFacilitator,
+        setSelectedIsFacilitator,
+        selectedSharedIsMEL,
+        setSelectedIsMEL
     }
 }
 
@@ -550,4 +584,13 @@ export const applyAssignAction = (conditions, stage, dataElement, values) => {
     return {
         value: ''
     }
+}
+
+export const filterDataValues = (dataElements, dataValues) => {
+    if (dataElements && dataElements?.length && dataValues?.length) {
+        return dataValues.filter(dv => {
+            return dataElements.includes(dv.dataElement) && !!dv.dataElement
+        })
+    }
+    return dataValues;
 }

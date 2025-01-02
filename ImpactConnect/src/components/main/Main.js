@@ -1,26 +1,47 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Pagination } from '@dhis2/ui';
-import React, { useEffect, useState } from 'react';
-import { ACTIVITY_STAGE_MAPPING, config, EVENT_OPTIONS, MEL_TEAM } from '../../consts.js';
+import React, { useContext, useEffect, useState } from 'react';
+import {
+    ACTIVITY_STAGE_MAPPING,
+    APP_GROUP,
+    config,
+    EVENT_OPTIONS,
+    FACILITATOR_GROUP,
+    MEL_TEAM_GROUP
+} from '../../consts.js';
 import {
     daysBetween,
     fetchEntities,
+    filterDataValues,
     getParticipant,
     isObjectEmpty,
     paginate,
     searchEntities,
+    SharedStateContext,
     sortEntities,
     trackerCreate
 } from '../../utils.js';
 import { DataElementComponent } from '../DataElement.js';
 import { Navigation } from '../Navigation.js';
+import NotFoundPage from '../NotFoundPage.js';
 import { SearchComponent } from '../SearchComponent.js';
 import { SpinnerComponent } from '../SpinnerComponent.js';
 import { TrainingsComponent } from '../TrainingsComponent.js';
 
 export const Main = () => {
     const engine = useDataEngine();
+
+    const sharedState = useContext(SharedStateContext)
+
+    const {
+        setSelectedIsAdmin,
+        setSelectedIsMEL,
+        setSelectedIsFacilitator,
+        selectedSharedIsMEL,
+        selectedSharedIsFacilitator,
+        selectedSharedIsAdmin
+    } = sharedState;
 
     const [dataElements, setDataElements] = useState([]);
     const [trainingProgram, setTrainingProgram] = useState('');
@@ -52,6 +73,8 @@ export const Main = () => {
     const [root, setRoot] = useState('');
     const [groups, setGroups] = useState([]);
     const [venue, setVenue] = useState('');
+    const [stageDataElements, setStageDataElements] = useState([]);
+    const [eventName, setEventName] = useState('');
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -68,7 +91,7 @@ export const Main = () => {
         user: {
             resource: 'me',
             params: {
-                fields: 'username, organisationUnits(id, root), userGroups(id, displayName)'
+                fields: 'username, organisationUnits(id, root), userGroups(id, displayName, name)'
             }
         }
     }
@@ -92,6 +115,16 @@ export const Main = () => {
         }
     }
 
+    const stageDataElementsQuery = {
+        dataElements: {
+            resource: 'programStages',
+            params: {
+                paging: false,
+                fields: 'id,programStageDataElements(dataElement(id))'
+            }
+        }
+    }
+
     const {
         data: elementsData
     } = useDataQuery(dataElementsQuery);
@@ -102,11 +135,23 @@ export const Main = () => {
 
     const {data: userData} = useDataQuery(userQuery);
 
+    const {data: stagesDataElements} = useDataQuery(stageDataElementsQuery);
+
     useEffect(() => {
         if (userData?.user) {
             setRoot(userData.user.organisationUnits[0].id);
             setUser(userData.user.username);
             setGroups(userData.user.userGroups.map(ug => ug.displayName));
+
+            const userGroupsMemberships = userData.user.userGroups
+            if (userGroupsMemberships.length > 0) {
+                const isAdmin = userGroupsMemberships.some(member => APP_GROUP === member.name);
+                setSelectedIsAdmin(isAdmin);
+                const isFacilitator = userGroupsMemberships.some(member => FACILITATOR_GROUP === member.name);
+                setSelectedIsFacilitator(isFacilitator);
+                const isMEL = userGroupsMemberships.some(member => MEL_TEAM_GROUP === member.name);
+                setSelectedIsMEL(isMEL);
+            }
         }
     }, [userData])
 
@@ -139,6 +184,18 @@ export const Main = () => {
     }, [elementsData]);
 
     useEffect(() => {
+        if (stagesDataElements) {
+            const data = stagesDataElements.dataElements.programStages.map(ps => {
+                return {
+                    stage: ps.id,
+                    dataElements: ps.programStageDataElements.flatMap(psde => psde.dataElement.id)
+                }
+            })
+            setStageDataElements(data)
+        }
+    }, [stagesDataElements]);
+
+    useEffect(() => {
         if (trainingProgram && root) {
             setEventsLoading(true);
 
@@ -160,7 +217,7 @@ export const Main = () => {
                             const facilitators = attr.attribute === EVENT_OPTIONS.attributes.facilitators && attr.value;
                             return facilitators && facilitators.split(',').includes(user);
                         });
-                        if (groups.includes(MEL_TEAM)) {
+                        if (groups.includes(MEL_TEAM_GROUP) || groups.includes(APP_GROUP)) {
                             return true;
                         }
                         return facilitatorMatches;
@@ -221,7 +278,8 @@ export const Main = () => {
                         fetchEntities(engine, ids, '*').then(value => {
                             const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
                             setAllEntities(attendees);
-                            setEntities(attendees);
+                            setPage(1)
+                            setEntities(prev => [...attendees]);
 
                             setLoading(false)
                         });
@@ -253,6 +311,9 @@ export const Main = () => {
                             }
 
                             setSelectedStage(selectedStage);
+                        }
+                        if (attr.attribute === EVENT_OPTIONS.attributes.event) {
+                            setEventName(attr.value)
                         }
                     })
                 }
@@ -294,7 +355,7 @@ export const Main = () => {
 
     const pageParticipants = () => {
         const currentPage = paginate(entities, page, pageSize);
-        setPagedParticipants(currentPage);
+        setPagedParticipants(prev => [...currentPage]);
     }
 
     const groupDataElementValue = (dataElement) => {
@@ -312,8 +373,15 @@ export const Main = () => {
     }
 
     const dataElementValue = (date, dataElement, entity) => {
-        let event = entity.enrollments[0].events?.find(event => event.programStage === selectedStage
-            && datePart(event.occurredAt) === datePart(date));
+        const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+        let event = entity.enrollments[0].events?.find(event => {
+            const match = event.programStage === selectedStage;
+            if (match) {
+                return event.dataValues?.some(dv => dv.dataElement === mapping.mappings[EVENT_OPTIONS.attributes.event]
+                    && dv.value === eventName)
+            }
+            return match;
+        });
         const activeEvent = entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
         const editedEntity = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
 
@@ -361,19 +429,28 @@ export const Main = () => {
             })
         }
 
+        const dataElements = stageDataElements.find(sde => sde.stage === selectedStage)?.dataElements;
         const repeatable = stages.find(stage => stage.id === selectedStage)?.repeatable;
 
         //Loop through each edit records and recreate event data for
         _edits.forEach(edit => {
             Map.groupBy(edit.values, ({date}) => datePart(date)).keys().forEach(eventDate => {
-                let event = edit.entity?.enrollments[0].events?.find(event => event.programStage === selectedStage &&
-                    datePart(event.occurredAt) === eventDate);
+                let event = edit.entity?.enrollments[0].events?.find(event => {
+                    const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+                    const match = event.programStage === selectedStage;
+                    if (match) {
+                        return event.dataValues?.some(dv => dv.dataElement === mapping.mappings[EVENT_OPTIONS.attributes.event]
+                            && dv.value === eventName)
+                    }
+                    return match;
+                });
                 const values = filterValues(edit.values, eventDate);
 
                 if (!event) {
                     const existingEvent = edit.entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
                     if (existingEvent && !repeatable) {
                         event = existingEvent;
+                        event.dataValues = filterDataValues(dataElements, event.dataValues);
                     } else {
                         event = {
                             programStage: selectedStage,
@@ -439,7 +516,7 @@ export const Main = () => {
 
                     const dataValues = event.dataValues.filter(dv => dv.dataElement !== de.dataElement) || [];
                     dataValues.push(dataValue);
-                    event.dataValues = dataValues;
+                    event.dataValues = filterDataValues(dataElements, dataValues);
                 })
 
                 events.push(event);
@@ -452,8 +529,9 @@ export const Main = () => {
                 fetchEntities(engine, entities.map(e => e.trackedEntity), '*').then(value => {
                     const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
                     setAllEntities(attendees);
-                    setEntities(attendees);
                     setSaving(false);
+                    setPage(1);
+                    setEntities(prev => [...attendees]);
                 });
                 show({msg: i18n.t('Attendance successfully updated'), type: 'success'});
             } else {
@@ -565,7 +643,7 @@ export const Main = () => {
         }
     }
 
-    return (
+    return (!(selectedSharedIsMEL || selectedSharedIsFacilitator || selectedSharedIsAdmin) ? <NotFoundPage/> : (
         <>
             <div className="flex flex-row w-full h-full">
                 <div className="page">
@@ -814,5 +892,5 @@ export const Main = () => {
                 </div>
             </div>
         </>
-    )
+    ))
 }
