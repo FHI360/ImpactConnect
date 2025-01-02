@@ -5,4 +5,7 @@ src/locales
 build/app
 /i18n
 /.idea
+build
+package-lock.json
 package.json
+yarn.lock
