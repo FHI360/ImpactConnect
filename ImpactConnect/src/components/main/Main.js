@@ -12,7 +12,8 @@ import {
 } from '../../consts.js';
 import {
     daysBetween,
-    fetchEntities, filterDataValues,
+    fetchEntities,
+    filterDataValues,
     getParticipant,
     isObjectEmpty,
     paginate,
@@ -38,7 +39,8 @@ export const Main = () => {
         setSelectedIsMEL,
         setSelectedIsFacilitator,
         selectedSharedIsMEL,
-        selectedSharedIsFacilitator
+        selectedSharedIsFacilitator,
+        selectedSharedIsAdmin
     } = sharedState;
 
     const [dataElements, setDataElements] = useState([]);
@@ -72,6 +74,7 @@ export const Main = () => {
     const [groups, setGroups] = useState([]);
     const [venue, setVenue] = useState('');
     const [stageDataElements, setStageDataElements] = useState([]);
+    const [eventName, setEventName] = useState('');
 
     const {show} = useAlert(
         ({msg}) => msg,
@@ -146,7 +149,7 @@ export const Main = () => {
                 setSelectedIsAdmin(isAdmin);
                 const isFacilitator = userGroupsMemberships.some(member => FACILITATOR_GROUP === member.name);
                 setSelectedIsFacilitator(isFacilitator);
-                const isMEL = userGroupsMemberships.some(member => APP_GROUP === member.name);
+                const isMEL = userGroupsMemberships.some(member => MEL_TEAM_GROUP === member.name);
                 setSelectedIsMEL(isMEL);
             }
         }
@@ -214,7 +217,7 @@ export const Main = () => {
                             const facilitators = attr.attribute === EVENT_OPTIONS.attributes.facilitators && attr.value;
                             return facilitators && facilitators.split(',').includes(user);
                         });
-                        if (groups.includes(MEL_TEAM_GROUP)) {
+                        if (groups.includes(MEL_TEAM_GROUP) || groups.includes(APP_GROUP)) {
                             return true;
                         }
                         return facilitatorMatches;
@@ -275,7 +278,8 @@ export const Main = () => {
                         fetchEntities(engine, ids, '*').then(value => {
                             const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
                             setAllEntities(attendees);
-                            setEntities(attendees);
+                            setPage(1)
+                            setEntities(prev => [...attendees]);
 
                             setLoading(false)
                         });
@@ -307,6 +311,9 @@ export const Main = () => {
                             }
 
                             setSelectedStage(selectedStage);
+                        }
+                        if (attr.attribute === EVENT_OPTIONS.attributes.event) {
+                            setEventName(attr.value)
                         }
                     })
                 }
@@ -348,7 +355,7 @@ export const Main = () => {
 
     const pageParticipants = () => {
         const currentPage = paginate(entities, page, pageSize);
-        setPagedParticipants(currentPage);
+        setPagedParticipants(prev => [...currentPage]);
     }
 
     const groupDataElementValue = (dataElement) => {
@@ -366,8 +373,15 @@ export const Main = () => {
     }
 
     const dataElementValue = (date, dataElement, entity) => {
-        let event = entity.enrollments[0].events?.find(event => event.programStage === selectedStage
-            && datePart(event.occurredAt) === datePart(date));
+        const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+        let event = entity.enrollments[0].events?.find(event => {
+            const match = event.programStage === selectedStage;
+            if (match) {
+                return event.dataValues?.some(dv => dv.dataElement === mapping.mappings[EVENT_OPTIONS.attributes.event]
+                    && dv.value === eventName)
+            }
+            return match;
+        });
         const activeEvent = entity.enrollments[0].events?.find(event => event.programStage === selectedStage);
         const editedEntity = edits.find(edit => edit.entity.trackedEntity === entity.trackedEntity);
 
@@ -421,8 +435,15 @@ export const Main = () => {
         //Loop through each edit records and recreate event data for
         _edits.forEach(edit => {
             Map.groupBy(edit.values, ({date}) => datePart(date)).keys().forEach(eventDate => {
-                let event = edit.entity?.enrollments[0].events?.find(event => event.programStage === selectedStage &&
-                    datePart(event.occurredAt) === eventDate);
+                let event = edit.entity?.enrollments[0].events?.find(event => {
+                    const mapping = EVENT_OPTIONS.stageMapping.find(sm => sm.id === selectedStage);
+                    const match = event.programStage === selectedStage;
+                    if (match) {
+                        return event.dataValues?.some(dv => dv.dataElement === mapping.mappings[EVENT_OPTIONS.attributes.event]
+                            && dv.value === eventName)
+                    }
+                    return match;
+                });
                 const values = filterValues(edit.values, eventDate);
 
                 if (!event) {
@@ -508,9 +529,9 @@ export const Main = () => {
                 fetchEntities(engine, entities.map(e => e.trackedEntity), '*').then(value => {
                     const attendees = sortEntities(value.map(v => v.entity), nameAttributes);
                     setAllEntities(attendees);
-                    setEntities(attendees);
                     setSaving(false);
-                    setPage(0);
+                    setPage(1);
+                    setEntities(prev => [...attendees]);
                 });
                 show({msg: i18n.t('Attendance successfully updated'), type: 'success'});
             } else {

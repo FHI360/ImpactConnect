@@ -589,7 +589,7 @@ export const applyAssignAction = (conditions, stage, dataElement, values) => {
 export const filterDataValues = (dataElements, dataValues) => {
     if (dataElements && dataElements?.length && dataValues?.length) {
         return dataValues.filter(dv => {
-            return dataElements.includes(dv.dataElement)
+            return dataElements.includes(dv.dataElement) && !!dv.dataElement
         })
     }
     return dataValues;
