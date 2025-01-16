@@ -2,6 +2,8 @@ import { useDataEngine } from '@dhis2/app-runtime';
 import PropTypes from 'prop-types';
 import React, { useEffect, useState } from 'react';
 import { VENUE_NAME } from '../consts.js';
+import { SingleSelectField } from '@dhis2/ui';
+import { SingleSelectOption } from '@dhis2-ui/select';
 
 export const VenueComponent = ({
                                    venueSelected = (_) => {
@@ -63,107 +65,95 @@ export const VenueComponent = ({
     return <>
         <div className="flex flex-col gap-y-2">
             <div className="flex flex-row">
-                <select className="select"
-                        value={selectedLevel2}
-                        onChange={(event) => {
-                            venueSelected('');
-                            const selected = event.target.value;
-                            setLevel3OrgUnits([]);
-                            updateOrgUnits(3, selected);
-                            setSelectedLevel3('');
-                            setSelectedLevel4('');
-                            setSelectedLevel2(selected);
-                        }}>
-                    {loading && level2OrgUnits.length === 0 ? (
-                        <option>Loading...</option>
-                    ) : (
-                        <>
-                            <option defaultValue={''}>Select Province</option>
-                            {level2OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
-                                <option key={option.id} value={option.id}>
-                                    {option.displayName}
-                                </option>
-                            ))}
-                        </>
-                    )}
-                </select>
+                <SingleSelectField
+                    selected={selectedLevel2}
+                    loading={loading && level2OrgUnits.length === 0}
+                    clearable={true}
+                    className='w-full'
+                    placeholder={'Select Province'}
+                    filterable={true}
+                    onChange={(event) => {
+                        venueSelected('');
+                        const selected = event.selected;
+                        setLevel3OrgUnits([]);
+                        updateOrgUnits(3, selected);
+                        setSelectedLevel3('');
+                        setSelectedLevel4('');
+                        setSelectedLevel2(selected);
+                    }}>
+                    {level2OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                        <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
+                        </SingleSelectOption>
+                    ))}
+                </SingleSelectField>
             </div>
             {selectedLevel2 &&
                 <div className="flex flex-row">
-                    <select className="select"
-                            value={selectedLevel3}
-                            onChange={(event) => {
-                                venueSelected('');
-                                const selected = event.target.value;
-                                setLevel4OrgUnits([]);
-                                updateOrgUnits(4, selected);
-                                setSelectedLevel4('');
-                                setSelectedLevel3(selected);
-                            }}>
-                        {loading && level3OrgUnits.length === 0 ? (
-                            <option>Loading...</option>
-                        ) : (
-                            <>
-                                <option defaultValue={''}>Select District</option>
-                                {level3OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.displayName}
-                                    </option>
-                                ))}
-                            </>
-                        )}
-                    </select>
+                    <SingleSelectField
+                        className="w-full"
+                        selected={selectedLevel3}
+                        clearable={true}
+                        placeholder={'Select District'}
+                        filterable={true}
+                        loading={loading && level3OrgUnits.length === 0}
+                        onChange={(event) => {
+                            venueSelected('');
+                            const selected = event.selected;
+                            setLevel4OrgUnits([]);
+                            updateOrgUnits(4, selected);
+                            setSelectedLevel4('');
+                            setSelectedLevel3(selected);
+                        }}>
+                        {level3OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                            <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
+                            </SingleSelectOption>
+                        ))}
+                    </SingleSelectField>
                 </div>
             }
             {selectedLevel3 &&
                 <div className="flex flex-row">
-                    <select className="select"
-                            value={selectedLevel4}
-                            onChange={(event) => {
-                                venueSelected('');
-                                const selected = event.target.value;
-                                setLevel5OrgUnits([]);
-                                updateOrgUnits(5, selected);
-                                setSelectedLevel4(selected);
-                                setSelectedLevel5('')
-                            }}>
-                        {loading && level4OrgUnits.length === 0 ? (
-                            <option>Loading...</option>
-                        ) : (
-                            <>
-                                <option defaultValue={''}>Select Sector</option>
-                                {level4OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.displayName}
-                                    </option>
-                                ))}
-                            </>
-                        )}
-                    </select>
+                    <SingleSelectField
+                        className="w-full"
+                        selected={selectedLevel4}
+                        placeholder={'Select Sector'}
+                        loading={loading && level4OrgUnits.length === 0}
+                        clearable={true}
+                        filterable={true}
+                        onChange={(event) => {
+                            venueSelected('');
+                            const selected = event.selected;
+                            setLevel5OrgUnits([]);
+                            updateOrgUnits(5, selected);
+                            setSelectedLevel4(selected);
+                            setSelectedLevel5('')
+                        }}>
+                        {level4OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                            <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
+                            </SingleSelectOption>
+                        ))}
+                    </SingleSelectField>
                 </div>
             }
             {selectedLevel4 &&
                 <div className="flex flex-row">
-                    <select className="select"
-                            value={selectedLevel5}
-                            onChange={(event) => {
-                                const selected = event.target.value;
-                                venueSelected(selected);
-                                setSelectedLevel5(selected);
-                            }}>
-                        {loading && level5OrgUnits.length === 0 ? (
-                            <option>Loading...</option>
-                        ) : (
-                            <>
-                                <option defaultValue={''}>Select Venue</option>
-                                {level5OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.displayName}
-                                    </option>
-                                ))}
-                            </>
-                        )}
-                    </select>
+                    <SingleSelectField
+                        className="w-full"
+                        selected={selectedLevel5}
+                        placeholder={'Select Venue'}
+                        clearable={true}
+                        filterable={true}
+                        loading={loading && level5OrgUnits.length === 0}
+                        onChange={(event) => {
+                            const selected = event.selected;
+                            venueSelected(selected);
+                            setSelectedLevel5(selected);
+                        }}>
+                        {level5OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                            <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
+                            </SingleSelectOption>
+                        ))}
+                    </SingleSelectField>
                 </div>
             }
         </div>
