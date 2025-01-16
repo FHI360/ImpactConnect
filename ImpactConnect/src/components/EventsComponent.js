@@ -1,6 +1,6 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
-import { Modal, ModalActions, ModalContent, ModalTitle, Pagination, Transfer } from '@dhis2/ui';
+import { Modal, ModalActions, ModalContent, ModalTitle, Pagination, SingleSelectField, Transfer } from '@dhis2/ui';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -34,6 +34,7 @@ import OrganisationUnitComponent from './OrganisationUnitComponent.js';
 import { SearchComponent } from './SearchComponent.js';
 import { SpinnerComponent } from './SpinnerComponent.js';
 import { VenueComponent } from './VenueComponent.js';
+import { SingleSelectOption } from '@dhis2-ui/select';
 
 export const EventsComponent = () => {
     const engine = useDataEngine();
@@ -46,10 +47,6 @@ export const EventsComponent = () => {
         setSelectedIsMEL,
         setSelectedIsFacilitator,
     } = sharedState;
-
-    if (!(selectedSharedIsMEL || selectedSharedIsAdmin)) {
-        return <NotFoundPage/>;
-    }
 
     const [selectedVenue, setSelectedVenue] = useState('');
     const [trainings, setTrainings] = useState([]);
@@ -448,6 +445,7 @@ export const EventsComponent = () => {
                         label: attr.value
                     }
                 }));
+                console.log('trainings', trainings, 'selected', selectedTraining)
                 setTrainings(Array.from(trainings));
             }
         })
@@ -1085,23 +1083,23 @@ export const EventsComponent = () => {
                                                                                className="label">
                                                                             Existing Events
                                                                         </label>
-                                                                        <select
-                                                                            className="select"
-                                                                            value={selectedTraining}
+                                                                        <SingleSelectField
+                                                                            className="w-full"
+                                                                            selected={selectedTraining}
+                                                                            clearable={true}
+                                                                            filterable={true}
+                                                                            placeholder={'Select event'}
                                                                             onChange={(event) => {
-                                                                                setSelectedTraining(event.target.value);
+                                                                                setSelectedTraining(event.selected);
                                                                             }}>
-                                                                            <option
-                                                                                selected>Select event
-                                                                            </option>
-                                                                            {trainings.sort((o1, o2) => o1.label.localeCompare(o2.label)).map(option => {
-                                                                                    return <>
-                                                                                        <option
-                                                                                            value={option.id}>{option.label}</option>
-                                                                                    </>
-                                                                                }
+                                                                            {trainings.sort((o1, o2) => o1.label.localeCompare(o2.label)).map(option => (
+                                                                                    <SingleSelectOption
+                                                                                        label={option.label}
+                                                                                        value={option.id}>
+                                                                                    </SingleSelectOption>
+                                                                                )
                                                                             )}
-                                                                        </select>
+                                                                        </SingleSelectField>
                                                                     </div>
                                                                 }
                                                                 {selectedVenue && ((editMode && selectedTraining) || !editMode) &&
