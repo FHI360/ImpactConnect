@@ -259,7 +259,7 @@ export const DataElementComponent = ({
     return (
         <>
             <div>
-                {dataElement?.optionSet?.id && visible &&
+                {dataElement?.optionSet?.id && visible && options.length &&
                     <div className="flex flex-col">
                         {labelVisible &&
                             <label className="label">
