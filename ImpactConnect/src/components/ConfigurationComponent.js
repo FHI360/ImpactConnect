@@ -24,11 +24,6 @@ const ConfigurationComponent = () => {
         setSelectedIsFacilitator,
     } = sharedState;
 
-    if (!selectedSharedIsAdmin) {
-        // Render the 404 page if the user doesn't have permission
-        return <NotFoundPage />;
-    }
-
     const [keyExists, setKeyExists] = useState({});
     const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
     const [participantsProgram, setParticipantsProgram] = useState('');
@@ -317,7 +312,7 @@ const ConfigurationComponent = () => {
         dataStoreOperation('configuredStages', stages);
     }
 
-    return (
+    return (!selectedSharedIsAdmin) ? <NotFoundPage/> : (
         <>
             <div className="flex flex-row w-full h-full">
                 <div className="page">

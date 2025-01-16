@@ -973,7 +973,7 @@ export const EventsComponent = () => {
         saveAs(new Blob([buffer]), 'Attendance.xlsx');
     }
 
-    return (
+    return (!(selectedSharedIsMEL || selectedSharedIsAdmin)) ? <NotFoundPage/> : (
         <>
             <div className="flex flex-row w-full h-full">
                 <div className="page">
