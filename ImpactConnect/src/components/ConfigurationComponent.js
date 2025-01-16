@@ -1,6 +1,6 @@
 import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
-import { Transfer } from '@dhis2/ui';
+import { SingleSelectField, Transfer } from '@dhis2/ui';
 import React, { useContext, useEffect, useState } from 'react';
 import { APP_GROUP, config, FACILITATOR_GROUP, MEL_TEAM_GROUP } from '../consts.js';
 import { createOrUpdateDataStore, SharedStateContext } from '../utils.js';
@@ -11,6 +11,7 @@ import { Navigation } from './Navigation.js';
 import NotFoundPage from './NotFoundPage.js';
 import ProgramComponent from './ProgramComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
+import { SingleSelectOption } from '@dhis2-ui/select';
 
 const ConfigurationComponent = () => {
     const sharedState = useContext(SharedStateContext)
@@ -351,23 +352,22 @@ const ConfigurationComponent = () => {
                                             <label className="label">
                                                 Event Unique Name Attribute
                                             </label>
-                                            <select className="select"
-                                                    value={eventNameAttribute}
-                                                    onChange={(event) => {
-                                                        setEventNameAttribute(event.target.value);
-                                                        dataStoreOperation('eventNameAttribute', event.target.value);
-                                                    }}>
-                                                <option
-                                                    selected>Select one
-                                                </option>
-                                                {(trainingAttributesData || []).map(option => {
-                                                        return <>
-                                                            <option
-                                                                value={option.value}>{option.label}</option>
-                                                        </>
-                                                    }
+                                            {trainingAttributesData.length && <SingleSelectField
+                                                className="w-full"
+                                                selected={eventNameAttribute}
+                                                clearable={true}
+                                                filterable={true}
+                                                placeholder={'Select one'}
+                                                onChange={(event) => {
+                                                    setEventNameAttribute(event.selected);
+                                                    dataStoreOperation('eventNameAttribute', event.selected);
+                                                }}>
+                                                {(trainingAttributesData || []).map(option => (
+                                                        <SingleSelectOption
+                                                            value={option.value} label={option.label}></SingleSelectOption>
+                                                    )
                                                 )}
-                                            </select>
+                                            </SingleSelectField>}
                                         </div>
                                     </div>
                                 </>
@@ -475,7 +475,7 @@ const ConfigurationComponent = () => {
                                                                         setSelectedGroupDataElements([]);
 
                                                                         // Create a shallow copy of configuredStages to avoid mutating the state directly
-                                                                        const updatedStages = { ...configuredStages };
+                                                                        const updatedStages = {...configuredStages};
 
                                                                         // Retrieve the existing stage configuration or initialize with default structure
                                                                         const stage = updatedStages[selection] || {
@@ -501,7 +501,8 @@ const ConfigurationComponent = () => {
                                                 </>
                                             }
                                             {!editMode && !configureMode &&
-                                                <ConfiguredStagesComponent stages={stages} configuredStages={configuredStages}
+                                                <ConfiguredStagesComponent stages={stages}
+                                                                           configuredStages={configuredStages}
                                                                            single={true}
                                                                            onSort={(stage) => {
                                                                                setConfigureMode(true);
@@ -542,7 +543,7 @@ const ConfigurationComponent = () => {
                                                         setSelectedIndividualDataElements([...selectedIndividualDataElements, de]);
                                                     }
                                                 }}
-                                                onDelete={()=> {
+                                                onDelete={() => {
                                                     const stages = configuredStages;
                                                     delete stages[selectedStage]['individualDataElements'];
                                                     if (!stages[selectedStage]['individualDataElements'] &&
@@ -579,7 +580,7 @@ const ConfigurationComponent = () => {
                                                 moveDataElement={(from, to) => moveDataElement('individual', from, to)}
                                                 onClose={() => {
                                                     // Create a shallow copy of configuredStages to avoid mutating the original state directly
-                                                    const updatedStages = { ...configuredStages };
+                                                    const updatedStages = {...configuredStages};
 
                                                     if (selectedStage) {
                                                         // Set the selected stage with current selections

@@ -2,6 +2,8 @@ import { useDataQuery } from '@dhis2/app-runtime'
 import i18n from '@dhis2/d2-i18n';
 import PropTypes from 'prop-types';
 import React, { useEffect } from 'react'
+import { SingleSelectField } from '@dhis2/ui';
+import { SingleSelectOption } from '@dhis2-ui/select';
 
 const query = {
     programStages: {
@@ -27,23 +29,30 @@ const ProgramStageComponent = ({selectedProgram, selectedStage, setSelectedStage
 
     const handleStageChange = event => {
         event.preventDefault();
-        setSelectedStage(event.target.value);
+        setSelectedStage(event.selected);
     };
     return (
         <div>
             <label htmlFor="stage" className="label">
                 {i18n.t('Select program stage')}
             </label>
-            <select id="stage"
-                    className="select"
-                    value={selectedStage}
-                    onChange={handleStageChange}>
-                <option selected>Choose a program stage</option>
-                {data?.programStages?.programStages?.filter(s => !(filteredStages || []).includes(s.id)).map(({id, displayName}) => (
-                        <option label={displayName} value={id} key={id}/>
+            <SingleSelectField
+                id="stage"
+                className="w-full"
+                clearable={true}
+                filterable={true}
+                placeholder={'Choose a program stage'}
+                selected={selectedStage}
+                onChange={handleStageChange}>
+                {data?.programStages?.programStages?.filter(s => !(filteredStages || [])
+                    .includes(s.id)).map(({
+                                              id,
+                                              displayName
+                                          }) => (
+                        <SingleSelectOption label={displayName} value={id} key={id}/>
                     )
                 )}
-            </select>
+            </SingleSelectField>
         </div>
     )
 }

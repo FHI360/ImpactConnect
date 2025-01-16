@@ -2,6 +2,8 @@ import { useDataEngine } from '@dhis2/app-runtime';
 import PropTypes from 'prop-types';
 import React, { useEffect, useState } from 'react';
 import { DataElementComponent } from './DataElement.js';
+import { SingleSelectField } from '@dhis2/ui';
+import { SingleSelectOption } from '@dhis2-ui/select';
 
 export const TrainingsComponent = ({program, trainings, trainingSelected, loading}) => {
     const engine = useDataEngine();
@@ -46,30 +48,22 @@ export const TrainingsComponent = ({program, trainings, trainingSelected, loadin
                        className="label">
                     Available Events
                 </label>
-                <select
-                    className="select"
-                    value={selectedTraining}
+                <SingleSelectField
+                    className="w-full"
+                    selected={selectedTraining}
+                    placeholder={'Select training'}
+                    clearable={true}
+                    filterable={true}
                     onChange={(event) => {
-                        setSelectedTraining(event.target.value);
-                        trainingSelected(event.target.value);
+                        setSelectedTraining(event.selected);
+                        trainingSelected(event.selected);
                     }}>
-                    {loading ? (
-                        <option>Loading...</option>
-                    ) : (
-                        <>
-                            <option
-                                selected>Select training
-                            </option>
-                            {trainings.sort((t1, t2) => t1?.label?.localeCompare(t2?.label)).map(option => {
-                                    return <>
-                                        <option
-                                            value={option.id}>{option.label}</option>
-                                    </>
-                                }
-                            )}
-                        </>
+                    {trainings.sort((t1, t2) => t1?.label?.localeCompare(t2?.label)).map(option => (
+                            <SingleSelectOption
+                                value={option.id} label={option.label}></SingleSelectOption>
+                        )
                     )}
-                </select>
+                </SingleSelectField>
             </div>
             {selectedTraining &&
                 <div className="">
