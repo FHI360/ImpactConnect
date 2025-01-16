@@ -36,7 +36,7 @@ const OrganisationUnitComponent = ({handleOUChange, selectedOU}) => {
 
     return (
         <div>
-            <div>
+            <div className="overflow-y-scroll max-h-screen w-full min-h-80">
                 {root.length > 0 &&
                     <OrganisationUnitTree
                         name={data['results']['organisationUnits'][0]['name']}
