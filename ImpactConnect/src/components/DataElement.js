@@ -280,7 +280,6 @@ export const DataElementComponent = ({
                                     setEdit(false);
                                     valueChanged(dataElement, event.selected);
                                     setSelectedValue(event.selected);
-                                    console.log('event.selected', event.selected)
                                 }}>
                                 {options.filter(o => !!o).sort((n1, n2) => n1.displayName.localeCompare(n2.displayName)).filter(option => !!option).map(option => (
                                     <SingleSelectOption label= {option.displayName} key={option.code} value={option.code}>
