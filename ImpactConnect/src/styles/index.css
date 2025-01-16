@@ -52,3 +52,7 @@
 .required {
     color: red;
 }
+
+div.layer.fixed {
+    @apply z-50;
+}

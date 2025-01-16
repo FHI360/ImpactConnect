@@ -1,11 +1,12 @@
 import { useAlert, useDataEngine } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
-import { CalendarInput } from '@dhis2/ui';
+import { CalendarInput, SingleSelectField } from '@dhis2/ui';
 import PropTypes from 'prop-types';
 import React, { useEffect, useMemo, useState } from 'react';
 import { EVENT_OPTIONS } from '../consts.js';
 import { applyConditionAction } from '../utils.js';
 import { SpinnerComponent } from './SpinnerComponent.js';
+import { SingleSelectOption } from '@dhis2-ui/select';
 
 export const DataElementComponent = ({
                                          dataElement,
@@ -267,27 +268,25 @@ export const DataElementComponent = ({
                             </label>
                         }
                         <div className="flex flex-row">
-                            <select className="select"
-                                    value={value ?? optionValue ?? ''}
-                                    disabled={(readonly && !edit) || !enabled}
-                                    onChange={(event) => {
-                                        setEdit(false);
-                                        valueChanged(dataElement, event.target.value);
-                                        setSelectedValue(event.target.value);
-                                    }}>
-                                {loading ? (
-                                    <option>Loading...</option>
-                                ) : (
-                                    <>
-                                        <option defaultValue={null}>Select one</option>
-                                        {options.filter(o => !!o).sort((n1, n2) => n1.displayName.localeCompare(n2.displayName)).filter(option => !!option).map(option => (
-                                            <option key={option.code} value={option.code}>
-                                                {option.displayName}
-                                            </option>
-                                        ))}
-                                    </>
-                                )}
-                            </select>
+                            <SingleSelectField
+                                filterable={true}
+                                className='w-full'
+                                selected={value ?? optionValue ?? ''}
+                                disabled={(readonly && !edit) || !enabled}
+                                placeholder={'Select one'}
+                                loading={loading}
+                                clearable={true}
+                                onChange={(event) => {
+                                    setEdit(false);
+                                    valueChanged(dataElement, event.selected);
+                                    setSelectedValue(event.selected);
+                                    console.log('event.selected', event.selected)
+                                }}>
+                                {options.filter(o => !!o).sort((n1, n2) => n1.displayName.localeCompare(n2.displayName)).filter(option => !!option).map(option => (
+                                    <SingleSelectOption label= {option.displayName} key={option.code} value={option.code}>
+                                    </SingleSelectOption>
+                                ))}
+                            </SingleSelectField>
                             {!edit && !readonly && optionAdd && enabled &&
                                 <>
                                     {!editOnly &&
