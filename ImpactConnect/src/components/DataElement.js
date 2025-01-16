@@ -259,7 +259,7 @@ export const DataElementComponent = ({
     return (
         <>
             <div>
-                {dataElement?.optionSet?.id && visible && options.length &&
+                {dataElement?.optionSet?.id && visible &&
                     <div className="flex flex-col">
                         {labelVisible &&
                             <label className="label">
@@ -271,7 +271,7 @@ export const DataElementComponent = ({
                             <SingleSelectField
                                 filterable={true}
                                 className='w-full'
-                                selected={value ?? optionValue ?? ''}
+                                selected={options.length && (value ?? optionValue) || ''}
                                 disabled={(readonly && !edit) || !enabled}
                                 placeholder={'Select one'}
                                 loading={loading}

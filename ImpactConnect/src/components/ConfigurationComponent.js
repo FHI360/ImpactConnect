@@ -352,9 +352,9 @@ const ConfigurationComponent = () => {
                                             <label className="label">
                                                 Event Unique Name Attribute
                                             </label>
-                                            {trainingAttributesData.length && <SingleSelectField
+                                            <SingleSelectField
                                                 className="w-full"
-                                                selected={eventNameAttribute}
+                                                selected={trainingAttributesData.length && eventNameAttribute || ''}
                                                 clearable={true}
                                                 filterable={true}
                                                 placeholder={'Select one'}
@@ -367,7 +367,7 @@ const ConfigurationComponent = () => {
                                                             value={option.value} label={option.label}></SingleSelectOption>
                                                     )
                                                 )}
-                                            </SingleSelectField>}
+                                            </SingleSelectField>
                                         </div>
                                     </div>
                                 </>
