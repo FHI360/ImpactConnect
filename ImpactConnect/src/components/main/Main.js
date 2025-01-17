@@ -17,6 +17,7 @@ import {
     getParticipant,
     isObjectEmpty,
     paginate,
+    prepareAndDownloadAttendance,
     searchEntities,
     SharedStateContext,
     sortEntities,
@@ -643,6 +644,10 @@ export const Main = () => {
         }
     }
 
+    const downloadAttendance = () => {
+        prepareAndDownloadAttendance(entities, orgUnits, nameAttributes);
+    }
+
     return (!(selectedSharedIsMEL || selectedSharedIsFacilitator || selectedSharedIsAdmin) ? <NotFoundPage/> : (
         <>
             <div className="flex flex-row w-full h-full">
@@ -721,11 +726,23 @@ export const Main = () => {
                                             {loading &&
                                                 <SpinnerComponent/>
                                             }
-                                            {entities.length > 0 &&
-                                                <div className="w-3/12">
-                                                    <SearchComponent search={(value) => search(value)}/>
+                                            <div className="flex flex-row">
+                                                {entities.length > 0 &&
+                                                    <div className="w-3/12">
+                                                        <SearchComponent search={(value) => search(value)}/>
+                                                    </div>
+                                                }
+                                                <div className="flex flex-row justify-end w-full">
+                                                    {entities.length > 0 &&
+                                                        <button type="button"
+                                                                onClick={downloadAttendance}
+                                                                className="primary-btn"
+                                                        >
+                                                            Download attendance
+                                                        </button>
+                                                    }
                                                 </div>
-                                            }
+                                            </div>
                                             <table
                                                 className="w-full text-sm text-left rtl:text-right text-gray-500 ">
                                                 <caption

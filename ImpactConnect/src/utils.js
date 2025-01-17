@@ -1,9 +1,11 @@
 import React, { createContext, useCallback, useState } from 'react';
 import classes from './App.module.css'
-import { config } from './consts.js';
+import { config, REPORT } from './consts.js';
 import padlock from './icons/padlock_resized.jpg';
 import refresh from './icons/refresh.png'
 import search from './icons/search.png'
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export const customImage = (source, size = 'small') => {
     // Check the source and set iconClass accordingly
@@ -593,4 +595,45 @@ export const filterDataValues = (dataElements, dataValues) => {
         })
     }
     return dataValues;
+}
+
+
+export const prepareAndDownloadAttendance = async (participants, orgUnits, nameAttributes) => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Attendance',
+        {
+            headerFooter: {
+                firstFooter: 'By ticking or marking on the column for photo, video and story consent on this attendance list, I allow FHI360 and/or its partners and/or funders to reproduce, publish and/or otherwise use pictures and/or videos of me and/or my story in print and electronic format.'
+            },
+            pageSetup: {paperSize: 9, orientation: 'landscape'}
+        }
+    );
+    worksheet.columns = [
+        {header: 'Name of Participant', key: 'name', width: 50},
+        {header: 'Participant TEID', key: 'teid', width: 50},
+        {header: 'Gender', key: 'gender', width: 10},
+        {header: 'Do you have any type of disability? Yes/No', key: 'disability', width: 10,},
+        {header: 'School', key: 'school', width: 30},
+        {header: 'Position', key: 'position', width: 30},
+        {header: 'Phone Number', key: 'phone', width: 30},
+        {header: 'Photo/Video/Story consent', key: 'consent', width: 20},
+        {header: 'Signature', key: 'signature', width: 20}
+    ];
+    const rows = participants.map(participant => {
+        return {
+            school: orgUnits.find(ou => ou.id === participant.orgUnit)?.displayName,
+            name: getParticipant(participant, nameAttributes),
+            teid: participant.trackedEntity,
+            phone: getAttribute(participant, REPORT.PHONE),
+            gender: getAttribute(participant, REPORT.GENDER) === '1' ? 'M' : 'F',
+            position: getAttribute(participant, REPORT.POSITION)
+        }
+    })
+
+    worksheet.addRows(rows);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    // Save the Excel file
+    saveAs(new Blob([buffer]), 'Attendance.xlsx');
 }
