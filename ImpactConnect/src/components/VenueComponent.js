@@ -1,7 +1,7 @@
 import { useDataEngine } from '@dhis2/app-runtime';
 import PropTypes from 'prop-types';
 import React, { useEffect, useState } from 'react';
-import { VENUE_NAME } from '../consts.js';
+import { EXCLUDED_ORG_UNIT, VENUE_NAME } from '../consts.js';
 import { SingleSelectField } from '@dhis2/ui';
 import { SingleSelectOption } from '@dhis2-ui/select';
 
@@ -62,6 +62,11 @@ export const VenueComponent = ({
         });
     }
 
+    const prepareOrgUnits = (orgUnits) => {
+        return orgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName))
+            .filter(ou => !EXCLUDED_ORG_UNIT.map(s => s.toLowerCase()).includes(ou.displayName.toLowerCase()))
+    }
+
     return <>
         <div className="flex flex-col gap-y-2">
             <div className="flex flex-row">
@@ -81,7 +86,7 @@ export const VenueComponent = ({
                         setSelectedLevel4('');
                         setSelectedLevel2(selected);
                     }}>
-                    {level2OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                    {prepareOrgUnits(level2OrgUnits).map(option => (
                         <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
                         </SingleSelectOption>
                     ))}
@@ -104,7 +109,7 @@ export const VenueComponent = ({
                             setSelectedLevel4('');
                             setSelectedLevel3(selected);
                         }}>
-                        {level3OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                        {prepareOrgUnits(level3OrgUnits).map(option => (
                             <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
                             </SingleSelectOption>
                         ))}
@@ -128,7 +133,7 @@ export const VenueComponent = ({
                             setSelectedLevel4(selected);
                             setSelectedLevel5('')
                         }}>
-                        {level4OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                        {prepareOrgUnits(level4OrgUnits).map(option => (
                             <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
                             </SingleSelectOption>
                         ))}
@@ -149,7 +154,7 @@ export const VenueComponent = ({
                             venueSelected(selected);
                             setSelectedLevel5(selected);
                         }}>
-                        {level5OrgUnits.sort((o1, o2) => o1?.displayName?.localeCompare(o2?.displayName)).map(option => (
+                        {prepareOrgUnits(level5OrgUnits).map(option => (
                             <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
                             </SingleSelectOption>
                         ))}

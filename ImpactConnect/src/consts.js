@@ -30,7 +30,9 @@ export const panelAction = 'Finding duplicate tracked entities'
 export const VENUE_NAME = 'Training/Meeting/Workshop Venues';
 export const MEL_TEAM_GROUP = 'MEL Team';
 export const FACILITATOR_GROUP = 'Facilitators';
-export const APP_GROUP = "ImpactConnectAdmins"
+export const APP_GROUP = "ImpactConnectAdmins";
+export const EXCLUDED_ORG_UNIT = ['Central'];
+export const APP_NAME = 'Tunozegusoma-Impact-Connect';
 
 export const TRAINING_STAGES = {
     TRAINING: 'SmUprI011oN',
