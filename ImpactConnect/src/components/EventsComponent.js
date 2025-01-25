@@ -16,7 +16,8 @@ import {
     filterDataValues,
     getParticipant,
     isObjectEmpty,
-    paginate, prepareAndDownloadAttendance,
+    paginate,
+    prepareAndDownloadAttendance,
     searchEntities,
     SharedStateContext,
     sortEntities,
@@ -1066,6 +1067,7 @@ export const EventsComponent = () => {
                                                                         <DataElementsComponent data={memoizedData}
                                                                                                disable={disable}
                                                                                                editOnly={editMode}
+                                                                                               required={true}
                                                                                                configuredCondition={configuredCondition}
                                                                                                setInvalid={(invalid) => setInvalid(invalid)}
                                                                                                setEditingOption={(editing) => setDisable(editing)}

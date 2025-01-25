@@ -373,6 +373,18 @@ export const SharedStateContext = createContext({
     },
     selectedSharedIsMEL: false,
     setSelectedIsMEL: () => {
+    },
+    selectedSharedProvince: '',
+    setSelectedProvince: () => {
+    },
+    selectedSharedDistrict: '',
+    setSelectedDistrict: () => {
+    },
+    selectedSharedSector: '',
+    setSelectedSector: () => {
+    },
+    selectedSharedVenue: '',
+    setSelectedVenue: () => {
     }
 })
 
@@ -384,6 +396,10 @@ export const useSharedState = () => {
     const [selectedSharedIsAdmin, setSelectedIsAdmin_] = useState(false);
     const [selectedSharedIsFacilitator, setSelectedIsFacilitator_] = useState(false);
     const [selectedSharedIsMEL, setSelectedIsMEL_] = useState(false);
+    const [selectedSharedProvince, setSelectedProvince_] = useState('');
+    const [selectedSharedDistrict, setSelectedDistrict_] = useState('');
+    const [selectedSharedSector, setSelectedSector_] = useState('');
+    const [selectedSharedVenue, setSelectedVenue_] = useState('');
 
 
     // memoizedCallbacks
@@ -414,6 +430,18 @@ export const useSharedState = () => {
     const setSelectedIsMEL = useCallback((data) => {
         setSelectedIsMEL_(data)
     }, []);
+    const setSelectedProvince = useCallback((data) => {
+        setSelectedProvince_(data)
+    }, []);
+    const setSelectedDistrict = useCallback((data) => {
+        setSelectedDistrict_(data)
+    }, []);
+    const setSelectedSector = useCallback((data) => {
+        setSelectedSector_(data)
+    }, []);
+    const setSelectedVenue = useCallback((data) => {
+        setSelectedVenue_(data)
+    }, []);
 
     return {
         selectedSharedOU,
@@ -429,7 +457,15 @@ export const useSharedState = () => {
         selectedSharedIsFacilitator,
         setSelectedIsFacilitator,
         selectedSharedIsMEL,
-        setSelectedIsMEL
+        setSelectedIsMEL,
+        selectedSharedProvince,
+        setSelectedProvince,
+        selectedSharedDistrict,
+        setSelectedDistrict,
+        selectedSharedSector,
+        setSelectedSector,
+        selectedSharedVenue,
+        setSelectedVenue
     }
 }
 
@@ -525,7 +561,7 @@ export const daysBetween = (startDate, endDate) => {
     }
 }
 
-export const getAttribute = (entity, attribute)=> {
+export const getAttribute = (entity, attribute) => {
     const attributes = entity.enrollments && entity.enrollments.length > 0 && entity.enrollments[0].attributes || entity.attributes;
     return attributes.find(attr => attr.attribute === attribute)?.value
 }
@@ -548,7 +584,7 @@ export const applyConditionAction = (conditions, stage, dataElement, values, val
                     }
                 }
                 if (condition.action === 'mark_invalid') {
-                    if (condition.operator === 'is_not_empty' && !value &&  values[dataElementOne]) {
+                    if (condition.operator === 'is_not_empty' && !value && values[dataElementOne]) {
                         return {
                             action: condition.action
                         }
@@ -599,12 +635,48 @@ export const filterDataValues = (dataElements, dataValues) => {
 
 
 export const prepareAndDownloadAttendance = async (participants, orgUnits, nameAttributes) => {
-    const workbook = new ExcelJS.Workbook();
+    /*const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Attendance',
         {
             headerFooter: {
                 firstFooter: 'By ticking or marking on the column for photo, video and story consent on this attendance list, I allow FHI360 and/or its partners and/or funders to reproduce, publish and/or otherwise use pictures and/or videos of me and/or my story in print and electronic format.'
             },
+            pageSetup: {paperSize: 9, orientation: 'landscape'}
+        }
+    );
+    worksheet.columns = [
+        {header: 'NameofParticipant', key: 'name', width: 50},
+        {header: 'ParticipantTEID', key: 'teid', width: 50},
+        {header: 'Gender', key: 'gender', width: 10},
+        //{header: 'Do you have any type of disability? YesNo', key: 'disability', width: 10,},
+        {header: 'School', key: 'school', width: 30},
+        {header: 'Position', key: 'position', width: 30},
+        {header: 'PhoneNumber', key: 'phone', width: 30},
+        {header: 'PhotoVideoStory consent', key: 'consent', width: 20},
+        {header: 'Signature', key: 'signature', width: 20}
+    ];
+    const rows = participants.map(participant => {
+        return {
+            school: orgUnits.find(ou => ou.id === participant.orgUnit)?.displayName,
+            name: getParticipant(participant, nameAttributes),
+            teid: participant.trackedEntity,
+            phone: getAttribute(participant, REPORT.PHONE),
+            gender: getAttribute(participant, REPORT.GENDER) === '1' ? 'M' : 'F',
+            position: getAttribute(participant, REPORT.POSITION)
+        }
+    })
+
+    worksheet.addRows(rows);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    // Save the Excel file
+    saveAs(new Blob([buffer]), 'Attendance.xlsx');
+*/
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Attendance',
+        {
             pageSetup: {paperSize: 9, orientation: 'landscape'}
         }
     );
@@ -619,6 +691,7 @@ export const prepareAndDownloadAttendance = async (participants, orgUnits, nameA
         {header: 'Photo/Video/Story consent', key: 'consent', width: 20},
         {header: 'Signature', key: 'signature', width: 20}
     ];
+    //worksheet.getCell('A2').value = 'Test';
     const rows = participants.map(participant => {
         return {
             school: orgUnits.find(ou => ou.id === participant.orgUnit)?.displayName,

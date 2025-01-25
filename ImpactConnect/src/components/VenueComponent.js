@@ -1,15 +1,28 @@
 import { useDataEngine } from '@dhis2/app-runtime';
 import PropTypes from 'prop-types';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { EXCLUDED_ORG_UNIT, VENUE_NAME } from '../consts.js';
 import { SingleSelectField } from '@dhis2/ui';
 import { SingleSelectOption } from '@dhis2-ui/select';
+import { SharedStateContext } from '../utils';
 
 export const VenueComponent = ({
                                    venueSelected = (_) => {
                                    }
                                }) => {
     const engine = useDataEngine();
+    const sharedState = useContext(SharedStateContext)
+    const {
+        selectedSharedDistrict,
+        selectedSharedProvince,
+        selectedSharedSector,
+        selectedSharedVenue,
+        setSelectedDistrict,
+        setSelectedProvince,
+        setSelectedSector,
+        setSelectedVenue
+    } = sharedState;
+
     const [level2OrgUnits, setLevel2OrgUnits] = useState([]);
     const [level3OrgUnits, setLevel3OrgUnits] = useState([]);
     const [level4OrgUnits, setLevel4OrgUnits] = useState([]);
@@ -24,7 +37,42 @@ export const VenueComponent = ({
         if (level2OrgUnits.length <= 0) {
             updateOrgUnits(2);
         }
+        if (selectedSharedVenue) {
+            venueSelected(selectedSharedVenue);
+        }
     }, [level2OrgUnits]);
+
+    useEffect(() => {
+        updateOrgUnits(3, selectedSharedProvince);
+
+    }, [selectedSharedProvince])
+    useEffect(() => {
+        setTimeout(()=> {
+            setSelectedLevel2(selectedSharedProvince);
+        }, 3000)
+
+    }, [level3OrgUnits])
+
+    useEffect(() => {
+        updateOrgUnits(4, selectedSharedDistrict);
+    }, [selectedSharedDistrict])
+    useEffect(() => {
+        setTimeout(()=> {
+            setSelectedLevel3(selectedSharedDistrict);
+        }, 3000)
+
+    }, [level3OrgUnits])
+
+    useEffect(() => {
+        updateOrgUnits(5, selectedSharedSector);
+
+    }, [selectedSharedSector])
+    useEffect(() => {
+        setTimeout(()=> {
+            setSelectedLevel4(selectedSharedSector);
+        }, 3000)
+
+    }, [level3OrgUnits])
 
     const updateOrgUnits = (level, parent) => {
         let resource = 'organisationUnits';
@@ -71,7 +119,7 @@ export const VenueComponent = ({
         <div className="flex flex-col gap-y-2">
             <div className="flex flex-row">
                 <SingleSelectField
-                    selected={selectedLevel2}
+                    selected={selectedLevel2 || (prepareOrgUnits(level2OrgUnits).length > 0 && selectedSharedProvince) }
                     loading={loading && level2OrgUnits.length === 0}
                     clearable={true}
                     className='w-full'
@@ -85,6 +133,10 @@ export const VenueComponent = ({
                         setSelectedLevel3('');
                         setSelectedLevel4('');
                         setSelectedLevel2(selected);
+                        setSelectedProvince(selected);
+                        setSelectedDistrict('');
+                        setSelectedSector('');
+                        setSelectedVenue('');
                     }}>
                     {prepareOrgUnits(level2OrgUnits).map(option => (
                         <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
@@ -96,7 +148,7 @@ export const VenueComponent = ({
                 <div className="flex flex-row">
                     <SingleSelectField
                         className="w-full"
-                        selected={selectedLevel3}
+                        selected={selectedLevel3 || (prepareOrgUnits(level3OrgUnits).length > 0 && selectedSharedDistrict)}
                         clearable={true}
                         placeholder={'Select District'}
                         filterable={true}
@@ -108,6 +160,9 @@ export const VenueComponent = ({
                             updateOrgUnits(4, selected);
                             setSelectedLevel4('');
                             setSelectedLevel3(selected);
+                            setSelectedDistrict(selected);
+                            setSelectedSector('');
+                            setSelectedVenue('');
                         }}>
                         {prepareOrgUnits(level3OrgUnits).map(option => (
                             <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
@@ -120,7 +175,7 @@ export const VenueComponent = ({
                 <div className="flex flex-row">
                     <SingleSelectField
                         className="w-full"
-                        selected={selectedLevel4}
+                        selected={selectedLevel4 || (prepareOrgUnits(level4OrgUnits).length > 0 && selectedSharedSector)}
                         placeholder={'Select Sector'}
                         loading={loading && level4OrgUnits.length === 0}
                         clearable={true}
@@ -132,6 +187,8 @@ export const VenueComponent = ({
                             updateOrgUnits(5, selected);
                             setSelectedLevel4(selected);
                             setSelectedLevel5('')
+                            setSelectedSector(selected);
+                            setSelectedVenue('');
                         }}>
                         {prepareOrgUnits(level4OrgUnits).map(option => (
                             <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>
@@ -144,7 +201,7 @@ export const VenueComponent = ({
                 <div className="flex flex-row">
                     <SingleSelectField
                         className="w-full"
-                        selected={selectedLevel5}
+                        selected={selectedLevel5 || (prepareOrgUnits(level5OrgUnits).length > 0 && selectedSharedVenue)}
                         placeholder={'Select Venue'}
                         clearable={true}
                         filterable={true}
@@ -153,6 +210,7 @@ export const VenueComponent = ({
                             const selected = event.selected;
                             venueSelected(selected);
                             setSelectedLevel5(selected);
+                            setSelectedVenue(selected);
                         }}>
                         {prepareOrgUnits(level5OrgUnits).map(option => (
                             <SingleSelectOption key={option.id} value={option.id} label={option.displayName}>

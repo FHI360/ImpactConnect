@@ -56,3 +56,7 @@
 div.layer.fixed {
     @apply z-50;
 }
+
+div.calendar-clear-button {
+    @apply -mt-5;
+}

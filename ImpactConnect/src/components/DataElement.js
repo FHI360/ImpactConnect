@@ -263,7 +263,7 @@ export const DataElementComponent = ({
                     <div className="flex flex-col">
                         {labelVisible &&
                             <label className="label">
-                                {label || dataElement.name || dataElement.displayName} {dataElement?.id === EVENT_OPTIONS.attributes.event &&
+                                {label || dataElement.name || dataElement.displayName} {required &&
                                 <span className="required">*</span>}
                             </label>
                         }
@@ -282,7 +282,8 @@ export const DataElementComponent = ({
                                     setSelectedValue(event.selected);
                                 }}>
                                 {options.filter(o => !!o).sort((n1, n2) => n1.displayName.localeCompare(n2.displayName)).filter(option => !!option).map(option => (
-                                    <SingleSelectOption label= {option.displayName} key={option.code} value={option.code}>
+                                    <SingleSelectOption label={option.displayName} key={option.code}
+                                                        value={option.code}>
                                     </SingleSelectOption>
                                 ))}
                             </SingleSelectField>
@@ -383,7 +384,7 @@ export const DataElementComponent = ({
                                     className="checkbox"/>
                                 {labelVisible &&
                                     <label className="label pl-2 pt-2">
-                                        {label || dataElement.name || dataElement.displayName}{required && '*'}
+                                        {label || dataElement.name || dataElement.displayName}
                                     </label>
                                 }
                             </div>
@@ -413,7 +414,8 @@ export const DataElementComponent = ({
                             <div className="mb-5">
                                 {labelVisible &&
                                     <label className="text-left label">
-                                        {label || dataElement.name || dataElement.displayName}{required && '*'}
+                                        {label || dataElement.name || dataElement.displayName}{required &&
+                                        <span className="required">*</span>}
                                     </label>
                                 }
                                 <input
@@ -428,15 +430,24 @@ export const DataElementComponent = ({
                             <div className="mb-2 flex flex-col">
                                 {labelVisible &&
                                     <label className="text-left label">
-                                        {label || dataElement.name || dataElement.displayName}{required && '*'}
+                                        {label || dataElement.name || dataElement.displayName}{required &&
+                                        <span className="required">*</span>}
                                     </label>
                                 }
                                 <CalendarInput
                                     calendar="gregory"
                                     label=""
+                                    clearable={true}
                                     disabled={readonly || !enabled}
                                     date={(value ?? '').substring(0, 10)}
-                                    onDateSelect={(event) => valueChanged(dataElement, new Date(event.calendarDateString).toISOString())}
+                                    onDateSelect={(event) => {
+                                        let value = '';
+                                        if (event) {
+                                            value = new Date(event.calendarDateString).toISOString();
+                                        }
+                                        valueChanged(dataElement, value)
+                                    }
+                                    }
                                 />
                             </div>
                         }

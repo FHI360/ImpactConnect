@@ -1,11 +1,10 @@
 import React from 'react';
 import { customImage } from '../utils.js'
 import { Navigation } from './Navigation.js';
-import { APP_NAME } from '../consts';
 
 const NotFoundPage = () => {
     const homePath = () => {
-        return `/api/apps/${APP_NAME}/index.html`;
+        return (window.location + '').split('#')[0];
     }
     return (
         <div className="flex flex-row w-full h-full">
