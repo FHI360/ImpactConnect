@@ -1,12 +1,12 @@
 import { useAlert, useDataEngine } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { CalendarInput, SingleSelectField } from '@dhis2/ui';
+import { SingleSelectOption } from '@dhis2-ui/select';
 import PropTypes from 'prop-types';
 import React, { useEffect, useMemo, useState } from 'react';
 import { EVENT_OPTIONS } from '../consts.js';
 import { applyConditionAction } from '../utils.js';
 import { SpinnerComponent } from './SpinnerComponent.js';
-import { SingleSelectOption } from '@dhis2-ui/select';
 
 export const DataElementComponent = ({
                                          dataElement,

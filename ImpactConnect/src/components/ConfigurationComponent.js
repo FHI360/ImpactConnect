@@ -1,6 +1,7 @@
 import { useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { SingleSelectField, Transfer } from '@dhis2/ui';
+import { SingleSelectOption } from '@dhis2-ui/select';
 import React, { useContext, useEffect, useState } from 'react';
 import { APP_GROUP, config, FACILITATOR_GROUP, MEL_TEAM_GROUP } from '../consts.js';
 import { createOrUpdateDataStore, SharedStateContext } from '../utils.js';
@@ -11,7 +12,6 @@ import { Navigation } from './Navigation.js';
 import NotFoundPage from './NotFoundPage.js';
 import ProgramComponent from './ProgramComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
-import { SingleSelectOption } from '@dhis2-ui/select';
 
 const ConfigurationComponent = () => {
     const sharedState = useContext(SharedStateContext)
@@ -74,7 +74,7 @@ const ConfigurationComponent = () => {
             resource: `programs`,
             id: ({id}) => id,
             params: {
-                fields: ['id', 'displayName', 'programTrackedEntityAttributes(trackedEntityAttribute(id, displayName))', 'trackedEntityType'],
+                fields: ['id', 'displayName', 'programTrackedEntityAttributes(trackedEntityAttribute(*))', 'trackedEntityType'],
                 paging: 'false'
             },
         }

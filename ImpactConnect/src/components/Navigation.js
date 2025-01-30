@@ -29,6 +29,7 @@ export const Navigation = () => {
                 <ul>
                     <NavigationItem to="/">Home</NavigationItem>
                     <NavigationItem to="/events">Events</NavigationItem>
+                    <NavigationItem to="/import">TEI Import</NavigationItem>
                     <NavigationItem to="/configure">Configuration</NavigationItem>
                 </ul>
             </nav>

@@ -28,10 +28,11 @@
     "@dhis2/app-runtime": "^3.10.6",
     "@dhis2/ui": "^10.1.10",
     "@dhis2/ui-icons": "^9.11.3",
+    "ImpactConnect": "file:",
     "exceljs": "^4.4.0",
     "file-saver": "2.0.5",
-    "ImpactConnect": "file:",
     "flowbite": "^2.5.1",
+    "papaparse": "^5.5.1",
     "react-router-dom": "^6.26.1"
   }
 }

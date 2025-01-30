@@ -1,6 +1,7 @@
 import { useAlert, useDataEngine, useDataQuery } from '@dhis2/app-runtime';
 import i18n from '@dhis2/d2-i18n';
 import { Modal, ModalActions, ModalContent, ModalTitle, Pagination, SingleSelectField, Transfer } from '@dhis2/ui';
+import { SingleSelectOption } from '@dhis2-ui/select';
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
     ACTIVITY_STAGE_MAPPING,
@@ -31,7 +32,6 @@ import OrganisationUnitComponent from './OrganisationUnitComponent.js';
 import { SearchComponent } from './SearchComponent.js';
 import { SpinnerComponent } from './SpinnerComponent.js';
 import { VenueComponent } from './VenueComponent.js';
-import { SingleSelectOption } from '@dhis2-ui/select';
 
 export const EventsComponent = () => {
     const engine = useDataEngine();

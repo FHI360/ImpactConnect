@@ -138,7 +138,6 @@ export const updateTrackedEntityIgnoreAll = async (engine, tei_value, payload, t
 
     })
 
-    console.log('trackedEntities: ', trackedEntities)
     const mapped_trackedEntities = trackedEntities.map(entity => entity.trackedEntity);
     tei_value.attributes.push({
         "attribute": "sher1dupli1",
