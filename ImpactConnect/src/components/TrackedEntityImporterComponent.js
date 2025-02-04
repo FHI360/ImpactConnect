@@ -3,12 +3,8 @@ import ExcelJS from 'exceljs';
 import {saveAs} from 'file-saver';
 import PropTypes from 'prop-types';
 import React, {useEffect, useState} from 'react';
+import {LINKED_CELL_COLOR, ORG_UNIT_ID_NAME, TOTAL_ROWS, TRACKED_ENTITY_ID} from '../consts.js';
 import {fetchEntities, generateRandomId, trackerCreate} from '../utils.js';
-
-const TOTAL_ROWS = 3000;
-const ORG_UNIT_ID_NAME = 'Org Unit ID';
-const TRACKED_ENTITY_ID = 'Tracked Entity ID';
-const LINKED_CELL_COLOR = 'E5E5E5'; // Light gray
 
 export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attributesMetadata, nameAttributes}) => {
     const [loading, setLoading] = useState(false);
@@ -88,12 +84,13 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
             // Iterate through the original list and update the data elements
             const updatedProgramStages = programStages.map(program => ({
                 ...program,
-                dataElements: program.dataElements.map(de => replacementMap.get(de.id) || de)
+                dataElements: program.dataElements.map(de => replacementMap.get(de.id) || de).sort((a, b) => b.compulsory - a.compulsory)
             }));
 
-            setProgramStages((_)=> {
-                console.log('updatedProgramStages', updatedProgramStages)
-                setLoaded(true);
+            setProgramStages((_) => {
+                if (updatedProgramStages.length) {
+                    setLoaded(true);
+                }
                 return updatedProgramStages;
             });
         };
@@ -255,6 +252,8 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
         await new Promise((resolve) => setTimeout(resolve, 100));
 
+        attributesMetadata = attributesMetadata.sort((a, b) => b.mandatory - a.mandatory);
+
         nameAttributes = (nameAttributes || []).sort((a, b) => {
             return attributesMetadata.findIndex(attr => attr.id === b) - attributesMetadata.findIndex(attr => attr.id === a);
         });
@@ -310,7 +309,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
             prepareColumns({workbook, worksheet, columns, colOffset: originalOffset, data: ps.dataElements});
             for (let i = 0; i < TOTAL_ROWS; i++) {
                 //Link Tracked Entity ID
-                workbook.getWorksheet('Template').getCell(`A${i + 2}`).value = '';
+                workbook.getWorksheet('Template').getCell(`A${i + 2}`).numFmt = '@';
                 let cell = worksheet.getCell(`A${i + 2}`);
                 let sourceCell = `A${i + 2}`;
                 cell.value = {
@@ -319,18 +318,18 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
                 cell.protection = {
                     locked: true
                 };
-                cell.numFmt = '@';
                 cell.fill = {
                     type: 'pattern',
                     pattern: 'solid',
                     fgColor: {argb: LINKED_CELL_COLOR},
                 };
                 cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFBFBFBF' } },  
-                    bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-                    left: { style: 'thin', color: { argb: 'FFFFFFFF' } },  
-                    right: { style: 'thin', color: { argb: 'FFFFFFFF' } }  
+                    top: {style: 'thin', color: {argb: 'FFBFBFBF'}},
+                    bottom: {style: 'thin', color: {argb: 'FFBFBFBF'}},
+                    left: {style: 'thin', color: {argb: 'FFFFFFFF'}},
+                    right: {style: 'thin', color: {argb: 'FFFFFFFF'}}
                 };
+                workbook.getWorksheet('Template').getCell(`A${i + 2}`).value = '';
 
                 if (!orgUnit) {
                     //Link Org Unit ID
@@ -342,17 +341,16 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
                     cell.protection = {
                         locked: true
                     };
-                    cell.numFmt = '@';
                     cell.fill = {
                         type: 'pattern',
                         pattern: 'solid',
                         fgColor: {argb: LINKED_CELL_COLOR},
                     };
                     cell.border = {
-                        top: { style: 'thin', color: { argb: 'FFBFBFBF' } },  
-                        bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-                        left: { style: 'thin', color: { argb: 'FFFFFFFF' } },  
-                        right: { style: 'thin', color: { argb: 'FFFFFFFF' } }  
+                        top: {style: 'thin', color: {argb: 'FFBFBFBF'}},
+                        bottom: {style: 'thin', color: {argb: 'FFBFBFBF'}},
+                        left: {style: 'thin', color: {argb: 'FFFFFFFF'}},
+                        right: {style: 'thin', color: {argb: 'FFFFFFFF'}}
                     };
                 }
                 if (nameAttributes?.length) {
@@ -368,17 +366,16 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
                         cell.protection = {
                             locked: true
                         };
-                        cell.numFmt = '@';
                         cell.fill = {
                             type: 'pattern',
                             pattern: 'solid',
                             fgColor: {argb: LINKED_CELL_COLOR},
                         };
                         cell.border = {
-                            top: { style: 'thin', color: { argb: 'FFBFBFBF' } },  
-                            bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
-                            left: { style: 'thin', color: { argb: 'FFFFFFFF' } },  
-                            right: { style: 'thin', color: { argb: 'FFFFFFFF' } }  
+                            top: {style: 'thin', color: {argb: 'FFBFBFBF'}},
+                            bottom: {style: 'thin', color: {argb: 'FFBFBFBF'}},
+                            left: {style: 'thin', color: {argb: 'FFFFFFFF'}},
+                            right: {style: 'thin', color: {argb: 'FFFFFFFF'}}
                         };
                     });
                 }
@@ -529,103 +526,12 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
             const workbook = new ExcelJS.Workbook();
             await workbook.xlsx.load(e.target.result);
 
-            const worksheet = workbook.getWorksheet('Template');
-            if (!worksheet) {
-                setMessage('Invalid Excel file. Please use the template.');
-                return;
-            }
-
-            const headerRow = worksheet.getRow(1);
-            const headerMapping = {};
-            const attributeMapping = {};
-
-            // Map column indices to headers
-            headerRow.eachCell((cell, colNumber) => {
-                if (cell.value) {
-                    headerMapping[colNumber] = cell.value.toString().replace(' *', '');
-                }
-                if (cell.note?.texts?.[0]?.text.includes('Attribute ID')) {
-                    const match = cell.note.texts[0].text.match(/Attribute ID: (.+)/);
-                    if (match) {
-                        attributeMapping[colNumber] = match[1];
-                    }
-                }
-            });
-
-            setHeaders(headerMapping);
-            setAttributes(attributeMapping);
-
-            const requiredColumns = attributesMetadata
-                .filter((attr) => attr.mandatory)
-                .map((attr) => attr.displayName);
-
             const newErrors = [];
             const dataRows = [];
 
-            worksheet.eachRow((row, rowNumber) => {
-                if (rowNumber > 1) {
-                    const rowData = {};
-                    const rowErrors = [];
-
-                    for (const [colNumber, header] of Object.entries(headerMapping)) {
-                        const cell = row.getCell(Number(colNumber));
-                        const value = cell.value;
-                        const attributeId = attributeMapping[colNumber];
-                        let attribute = attributesMetadata.find((attr) => attr.id === attributeId);
-                        if (header === TRACKED_ENTITY_ID) {
-                            attribute = {
-                                valueType: 'TEXT'
-                            }
-                        }
-
-                        if (header === ORG_UNIT_ID_NAME) {
-                            attribute = {
-                                valueType: 'TEXT'
-                            }
-                        }
-
-                        const valueType = attributesMetadata.find(attr => attr.displayName === header)?.valueType || 'TEXT';
-                        if (valueType && (valueType !== 'BOOLEAN' || valueType !== 'TRUE_ONLY')) {
-                            // Validate required fields
-                            if (requiredColumns.includes(header) && (
-                                (valueType === 'NUMBER' || valueType === 'INTEGER')
-                                    ? value === null || value === undefined // Valid only if value is null/undefined for numbers
-                                    : !value // Valid for other value types
-                            )) {
-                                rowErrors.push({
-                                    rowNumber: rowNumber - 1,
-                                    errorMessage: `Missing value in column "${header}"`,
-                                });
-                            }
-                        }
-                        // Validate Org Unit ID
-                        if (header === ORG_UNIT_ID_NAME && value && !orgUnits.some((ou) => ou.id === value)) {
-                            rowErrors.push({
-                                rowNumber: rowNumber - 1,
-                                errorMessage: `Invalid Org Unit ID: "${value}"`,
-                            });
-                        }
-
-                        if (attribute) {
-                            if (attribute.options?.length) {
-                                const option = attribute.options.find((opt) => opt.displayName === value);
-                                rowData[attributeId] = option ? option.code : null;
-                            } else if (attribute.valueType === 'DATE' && value) {
-                                rowData[attributeId] = excelDateToJSDate(value);
-                            } else if (attribute.valueType === 'BOOLEAN' || attribute.valueType === 'TRUE_ONLY') {
-                                rowData[attributeId] = value === 'Yes';
-                            } else {
-                                rowData[attributeId] = value || '';
-                            }
-                        }
-                    }
-
-                    if (rowErrors.length) {
-                        newErrors.push(...rowErrors);
-                    } else {
-                        dataRows.push(rowData);
-                    }
-                }
+            processSheet({workbook, sheet: 'Template', data: dataRows, errors: newErrors});
+            programStages.forEach(ps => {
+                processSheet({workbook, sheet: ps.displayName, data: dataRows, errors: newErrors});
             });
 
             setErrors(newErrors);
@@ -638,6 +544,104 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
         reader.readAsArrayBuffer(file);
     };
+
+    const processSheet = ({workbook, sheet, data, errors, headers}) => {
+        const worksheet = workbook.getWorksheet(sheet);
+        if (!worksheet) {
+            setMessage('Invalid Excel file. Please use the template.');
+            return;
+        }
+
+        const headerRow = worksheet.getRow(1);
+        const headerMapping = {};
+        const attributeMapping = {};
+
+        // Map column indices to headers
+        headerRow.eachCell((cell, colNumber) => {
+            if (cell.value) {
+                headerMapping[colNumber] = cell.value.toString().replace(' *', '');
+            }
+            if (cell.note?.texts?.[0]?.text.includes('Attribute ID')) {
+                const match = cell.note.texts[0].text.match(/Attribute ID: (.+)/);
+                if (match) {
+                    attributeMapping[colNumber] = match[1];
+                }
+            }
+        });
+
+        setHeaders(headerMapping);
+        setAttributes(attributeMapping);
+
+        const requiredColumns = attributesMetadata
+            .filter((attr) => attr.mandatory)
+            .map((attr) => attr.displayName);
+
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 1) {
+                const rowData = {};
+                const rowErrors = [];
+
+                for (const [colNumber, header] of Object.entries(headerMapping)) {
+                    const cell = row.getCell(Number(colNumber));
+                    const value = cell.value;
+                    const attributeId = attributeMapping[colNumber];
+                    let attribute = attributesMetadata.find((attr) => attr.id === attributeId);
+                    if (header === TRACKED_ENTITY_ID) {
+                        attribute = {
+                            valueType: 'TEXT'
+                        }
+                    }
+
+                    if (header === ORG_UNIT_ID_NAME) {
+                        attribute = {
+                            valueType: 'TEXT'
+                        }
+                    }
+
+                    const valueType = attributesMetadata.find(attr => attr.displayName === header)?.valueType || 'TEXT';
+                    if (valueType && (valueType !== 'BOOLEAN' || valueType !== 'TRUE_ONLY')) {
+                        // Validate required fields
+                        if (requiredColumns.includes(header) && (
+                            (valueType === 'NUMBER' || valueType === 'INTEGER')
+                                ? value === null || value === undefined // Valid only if value is null/undefined for numbers
+                                : !value // Valid for other value types
+                        )) {
+                            rowErrors.push({
+                                rowNumber: rowNumber - 1,
+                                errorMessage: `Missing value in column "${header}", sheet "${worksheet.name}"`,
+                            });
+                        }
+                    }
+                    // Validate Org Unit ID
+                    if (header === ORG_UNIT_ID_NAME && value && !orgUnits.some((ou) => ou.id === value)) {
+                        rowErrors.push({
+                            rowNumber: rowNumber - 1,
+                            errorMessage: `Invalid Org Unit ID: "${value}"`,
+                        });
+                    }
+
+                    if (attribute) {
+                        if (attribute.options?.length) {
+                            const option = attribute.options.find((opt) => opt.displayName === value);
+                            rowData[attributeId] = option ? option.code : null;
+                        } else if (attribute.valueType === 'DATE' && value) {
+                            rowData[attributeId] = excelDateToJSDate(value);
+                        } else if (attribute.valueType === 'BOOLEAN' || attribute.valueType === 'TRUE_ONLY') {
+                            rowData[attributeId] = value === 'Yes';
+                        } else {
+                            rowData[attributeId] = value || '';
+                        }
+                    }
+                }
+
+                if (rowErrors.length) {
+                    errors.push(...rowErrors);
+                } else {
+                    data.push(rowData);
+                }
+            }
+        });
+    }
 
     const addDateValidation = (worksheet, columnIndex) => {
         for (let rowNumber = 2; rowNumber <= TOTAL_ROWS; rowNumber++) {

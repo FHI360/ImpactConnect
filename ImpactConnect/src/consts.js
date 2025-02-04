@@ -140,3 +140,9 @@ export const REPORT = {
     GENDER: 'RFDW6SognD1',
     POSITION: 'GT99Xd3kyVN'
 }
+
+//Excel template constants
+export const TOTAL_ROWS = 3000;
+export const ORG_UNIT_ID_NAME = 'Org Unit ID';
+export const TRACKED_ENTITY_ID = 'Tracked Entity ID';
+export const LINKED_CELL_COLOR = 'E5E5E5'; // Light gray
