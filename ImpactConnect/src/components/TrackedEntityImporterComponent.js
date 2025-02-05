@@ -6,6 +6,8 @@ import React, { useEffect, useState } from 'react';
 import { LINKED_CELL_COLOR, ORG_UNIT_ID_NAME, TOTAL_ROWS, TRACKED_ENTITY_ID } from '../consts.js';
 import { fetchEntities, generateRandomId, trackerCreate } from '../utils.js';
 
+const DATA_SHEET = 'Template';
+
 export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attributesMetadata, nameAttributes}) => {
 	const [loading, setLoading] = useState(false);
 	const [loaded, setLoaded] = useState(false);
@@ -284,7 +286,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 		let columns = [...defaultColumns];
 
-		const worksheet = workbook.addWorksheet('Template', {
+		const worksheet = workbook.addWorksheet(DATA_SHEET, {
 			properties: {tabColor: {argb: 'FFC000'}},
 		});
 		prepareColumns({workbook, worksheet, columns, colOffset, data: attributesMetadata})
@@ -417,7 +419,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 		// Process each row
 		const processRow = async (row) => {
-			const teid = row['Template'].trackedEntity;
+			const teid = row[DATA_SHEET].trackedEntity;
 
 			if (teid) {
 				let existingTEI = await fetchTrackedEntityInstance(teid);
@@ -426,7 +428,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 					existingTEI = existingTEI[0].entity;
 					console.log(`TEID ${teid} exists. Preparing for update...`);
 
-					const updatedAttributes = formatAttributes(row['Template']);
+					const updatedAttributes = formatAttributes(row[DATA_SHEET]);
 
 					existingTEI.attributes = updatedAttributes;
 					existingTEI.enrollments[0].attributes = updatedAttributes;
@@ -442,15 +444,15 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 			}
 
 			// Create new TEI
-			const newAttributes = formatAttributes(row['Template']);
+			const newAttributes = formatAttributes(row[DATA_SHEET]);
 			const newTEI = {
 				trackedEntityType,
-				orgUnit: row['Template'].orgUnit,
+				orgUnit: row[DATA_SHEET].orgUnit,
 				attributes: newAttributes,
 				enrollments: [
 					{
 						program,
-						orgUnit: row['Template'].orgUnit,
+						orgUnit: row[DATA_SHEET].orgUnit,
 						enrolledAt: new Date().toISOString(),
 						occurredAt: new Date().toISOString(),
 						attributes: newAttributes,
@@ -459,7 +461,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 				],
 			};
 
-			const newEvents = buildEvents(row, newTEI.trackedEntity, newTEI.enrollments[0].enrollment, row['Template'].orgUnit);
+			const newEvents = buildEvents(row, newTEI.trackedEntity, newTEI.enrollments[0].enrollment, row[DATA_SHEET].orgUnit);
 			if (newEvents.length) {
 				newTEI.enrollments[0].events = newEvents;
 			}
@@ -622,12 +624,12 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 			processSheet({
 				workbook,
-				sheet: 'Template',
+				sheet: DATA_SHEET,
 				data: dataRows,
 				errors: newErrors,
 				metadata: attributesMetadata
 			});
-			rows['Template'] = dataRows;
+			rows[DATA_SHEET] = dataRows;
 
 			const totalRows = dataRows.length;
 			programStages.forEach(ps => {
@@ -678,7 +680,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 				if (match) {
 					attributeMapping[colNumber] = match[1];
 
-					if (sheet !== 'Template') {
+					if (sheet !== DATA_SHEET) {
 						if (nameAttributes.includes(match[1]) || ['trackedEntity', 'orgUnit'].includes(match[1])) {
 							delete headerMapping[colNumber];
 						}
@@ -704,7 +706,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 					const attributeId = attributeMapping[colNumber];
 					let attribute = metadata.find((attr) => attr.id === attributeId);
 
-					if (sheet === 'Template') {
+					if (sheet === DATA_SHEET) {
 						if (header === TRACKED_ENTITY_ID) {
 							attribute = {
 								valueType: 'TEXT'
@@ -719,7 +721,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 					}
 
 					const valueType = metadata.find(attr => attr.displayName === header)?.valueType || 'TEXT';
-					if (sheet === 'Template' && valueType && (valueType !== 'BOOLEAN' || valueType !== 'TRUE_ONLY')) {
+					if (sheet === DATA_SHEET && valueType && (valueType !== 'BOOLEAN' || valueType !== 'TRUE_ONLY')) {
 						// Validate required fields
 						if (requiredColumns.includes(header) && (
 							(valueType === 'NUMBER' || valueType === 'INTEGER')
@@ -916,7 +918,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 			.filter((attr) => attr.mandatory)
 			.map((attr) => attr.displayName);
 
-		if (sheet !== 'Template') {
+		if (sheet !== DATA_SHEET) {
 			requiredColumns = programStages.find(ps => ps.displayName === sheet)?.dataElements
 				.filter((attr) => attr.mandatory)
 				.map((attr) => attr.displayName);
@@ -936,7 +938,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		let index = cellIndex;
 
 		let attribute = attributesMetadata?.find(a => a.id === attributes[sheet][index]);
-		if (sheet !== 'Template') {
+		if (sheet !== DATA_SHEET) {
 			//Modify display cell index to account for removed Tracked Entity ID, Org Unit and name attributes
 			index = parseInt(cellIndex) + 2 + nameAttributes.length;
 
@@ -1123,18 +1125,18 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 			{/* Table */}
 			<div className="overflow-x-auto overflow-y-auto max-h-[500px] border border-gray-300 rounded-md bg-white">
-				{rows['Template']?.length > 0 ? (
+				{rows[DATA_SHEET]?.length > 0 ? (
 					<table className="table-auto min-w-full border-collapse">
 						{/* Table Head */}
 						<thead className="bg-gray-200 sticky top-0 z-10">
 						<tr>
-							{Object.keys(headers['Template']).map((idx) => (
+							{Object.keys(headers[DATA_SHEET]).map((idx) => (
 								<th
 									key={idx}
 									className="px-4 py-3 text-left text-gray-700 font-semibold border border-gray-300"
 								>
-									{headerName(headers['Template'][idx])}
-									{columRequired(headers['Template'][idx], 'Template') && (
+									{headerName(headers[DATA_SHEET][idx])}
+									{columRequired(headers[DATA_SHEET][idx], DATA_SHEET) && (
 										<span className="text-red-500">*</span>
 									)}
 								</th>
@@ -1144,7 +1146,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 						{/* Table Body */}
 						<tbody>
-						{rows['Template'].map((row, rowIndex) => (
+						{rows[DATA_SHEET].map((row, rowIndex) => (
 							<React.Fragment key={rowIndex}>
 								{/* Primary Row (Ensuring Separation) */}
 								<tr
@@ -1153,12 +1155,12 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 									} hover:bg-blue-50 transition`}
 									onClick={() => handleRowClick(rowIndex)}
 								>
-									{Object.keys(attributes['Template']).map((colIndex) => (
+									{Object.keys(attributes[DATA_SHEET]).map((colIndex) => (
 										<td
 											key={colIndex}
 											className="px-4 py-3 border border-gray-300 text-gray-800 font-medium"
 										>
-											{cellValue('Template', row, colIndex)}
+											{cellValue(DATA_SHEET, row, colIndex)}
 										</td>
 									))}
 								</tr>
@@ -1166,16 +1168,16 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 								{/* Expanded Data Rows (Now Visually Separated from Next Primary Row) */}
 								{expandedRow === rowIndex && (
 									<tr>
-										<td colSpan={Object.keys(attributes['Template']).length} className="p-0">
+										<td colSpan={Object.keys(attributes[DATA_SHEET]).length} className="p-0">
 											<div className="border-l-4 border-blue-400 bg-gray-100 rounded-lg mt-2 mb-2">
 												{Object.keys(rows)
-													.filter((key) => key !== 'Template' && rows[key]?.length > rowIndex)
+													.filter((key) => key !== DATA_SHEET && rows[key]?.length > rowIndex)
 													.map((key) => (
 														<React.Fragment key={key}>
 															{/* Section Header for Expanded Data */}
 															<tr className="bg-gray-200 border-t-2 border-green-500">
 																<td
-																	colSpan={Object.keys(attributes['Template']).length}
+																	colSpan={Object.keys(attributes[DATA_SHEET]).length}
 																	className="px-4 py-3 font-semibold border border-gray-300"
 																>
 																	{key} Data
