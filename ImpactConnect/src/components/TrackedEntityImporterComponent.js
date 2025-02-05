@@ -107,7 +107,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 				programStages: {
 					resource: `programStages`,
 					params: {
-						fields: 'id,displayName,programStageDataElements(compulsory,dataElement(id, displayName, valueType, optionSet(id)))',
+						fields: 'id,repeatable,displayName,programStageDataElements(compulsory,dataElement(id, displayName, valueType, optionSet(id)))',
 						paging: 'false',
 						filter: `program.id:eq:${program}`,
 					}
