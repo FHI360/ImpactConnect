@@ -911,10 +911,16 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		}
 	}
 
-	const columRequired = (name) => {
-		const requiredColumns = attributesMetadata
+	const columRequired = (name, sheet) => {
+		let requiredColumns = attributesMetadata
 			.filter((attr) => attr.mandatory)
 			.map((attr) => attr.displayName);
+
+		if (sheet !== 'Template') {
+			requiredColumns = programStages.find(ps => ps.displayName === sheet)?.dataElements
+				.filter((attr) => attr.mandatory)
+				.map((attr) => attr.displayName);
+		}
 
 		return requiredColumns.includes(name);
 	}
@@ -1128,7 +1134,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 									className="px-4 py-3 text-left text-gray-700 font-semibold border border-gray-300"
 								>
 									{headerName(headers['Template'][idx])}
-									{columRequired(headers['Template'][idx]) && (
+									{columRequired(headers['Template'][idx], 'Template') && (
 										<span className="text-red-500">*</span>
 									)}
 								</th>
@@ -1184,7 +1190,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 																		className="px-4 py-2 text-left text-gray-700 font-semibold border border-gray-300"
 																	>
 																		{headerName(headers[key][colIdx])}
-																		{columRequired(headers[key][colIdx]) && (
+																		{columRequired(headers[key][colIdx], key) && (
 																			<span className="text-red-500">*</span>
 																		)}
 																	</th>
