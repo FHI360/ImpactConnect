@@ -406,7 +406,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 	// Upload Tracked Entity Instances
 	const uploadTEIs = async () => {
 		if (!program) {
-			setMessage('Please select an enrollment program.');
+			setMessage("Please select an enrollment program.");
 			return;
 		}
 
@@ -415,91 +415,179 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 		const trackedEntities = [];
 
-		const promises = rows.map(async (row) => {
-			const teid = row.trackedEntity;
+		// Process each row
+		const processRow = async (row) => {
+			const teid = row['Template'].trackedEntity;
 
 			if (teid) {
-				// Fetch the existing TEI
 				let existingTEI = await fetchTrackedEntityInstance(teid);
-				if (existingTEI && existingTEI.length) {
+
+				if (existingTEI?.length) {
 					existingTEI = existingTEI[0].entity;
 					console.log(`TEID ${teid} exists. Preparing for update...`);
 
-					// Build the attributes array for the update
-					const updatedAttributes = Object.keys(row)
-						.filter((key) => attributesMetadata?.map(attr => attr.id).includes(key)) // Use only tracked entity attributes
-						.map((key) => {
-							const valueType = attributesMetadata?.find(attr => attr.id === key)?.valueType;
-							let value = row[key];
-							if (valueType?.includes('DATE') && value) {
-								value = value.toISOString();
-							}
-							return {
-								attribute: key,
-								value
-							}
-						});
+					const updatedAttributes = formatAttributes(row['Template']);
 
-					// Prepare the payload for updating the existing TEI
 					existingTEI.attributes = updatedAttributes;
 					existingTEI.enrollments[0].attributes = updatedAttributes;
 
-					trackedEntities.push(existingTEI);
+					const updatedEvents = buildEvents(row, existingTEI.trackedEntity, existingTEI.enrollments[0].enrollment);
+					if (updatedEvents.length) {
+						existingTEI.enrollments[0].events = updatedEvents;
+					}
 
-					return; // Continue to the next row
+					trackedEntities.push(existingTEI);
+					return;
 				}
 			}
 
-			// If no TEID or not found, create a new TEI
-			const newAttributes = Object.keys(row)
-				.filter((key) => attributesMetadata.map(attr => attr.id).includes(key)) // Use only tracked entity attributes
-				.map((key) => {
-					const valueType = attributesMetadata?.find(attr => attr.id === key)?.valueType;
-					let value = row[key];
-					if (valueType?.includes('DATE') && value) {
-						value = value.toISOString();
-					}
-					return {
-						attribute: key,
-						value
-					}
-				});
-
+			// Create new TEI
+			const newAttributes = formatAttributes(row['Template']);
 			const newTEI = {
-				trackedEntityType: trackedEntityType,
-				orgUnit: row['orgUnit'],
+				trackedEntityType,
+				orgUnit: row['Template'].orgUnit,
 				attributes: newAttributes,
 				enrollments: [
 					{
-						program: program,
-						orgUnit: row['orgUnit'],
+						program,
+						orgUnit: row['Template'].orgUnit,
 						enrolledAt: new Date().toISOString(),
 						occurredAt: new Date().toISOString(),
 						attributes: newAttributes,
-						status: 'ACTIVE'
+						status: "ACTIVE",
 					},
 				],
 			};
 
-			trackedEntities.push(newTEI); // Add the new TEI to the batch
-		});
+			const newEvents = buildEvents(row, newTEI.trackedEntity, newTEI.enrollments[0].enrollment);
+			if (newEvents.length) {
+				newTEI.enrollments[0].events = newEvents;
+			}
+
+			trackedEntities.push(newTEI);
+		};
 
 		try {
-			await Promise.all(promises); // Wait for all rows to be processed
+			await Promise.all(transformRows(rows).map(processRow));
+
 			try {
 				await createTrackedEntityInstance(trackedEntities);
-				setMessage('All TEIs uploaded successfully.');
+				setMessage("All TEIs uploaded successfully.");
 			} catch (error) {
-				console.error('Error uploading TEIs:', error);
-				setMessage('An error occurred while uploading TEIs.');
+				console.error("Error uploading TEIs:", error);
+				setMessage("An error occurred while uploading TEIs.");
 			}
 		} catch (error) {
-			console.error('Error processing rows:', error);
-			setMessage('An error occurred during TEI processing.');
+			console.error("Error processing rows:", error);
+			setMessage("An error occurred during TEI processing.");
 		} finally {
 			setLoading(false);
 		}
 	};
+
+	const transformRows = (rows) => {
+		// Get the max number of rows based on the longest list in rows
+		const rowCount = Math.max(...Object.values(rows).map(list => list.length));
+
+		// Create an array where each object contains a row from each key at the same index
+		return Array.from({ length: rowCount }, (_, index) =>
+			Object.keys(rows).reduce((acc, key) => {
+				acc[key] = rows[key][index] || {}; // Use an empty object if index is out of bounds
+				return acc;
+			}, {})
+		);
+	};
+
+	const buildEvents = (row, trackedEntity, enrollment) => {
+		return programStages.map((ps) => {
+			const values = row[ps.displayName] || {};
+
+			// Check if event already exists in enrollment
+			const event = enrollment?.events.find((evt) => evt.programStage === ps.id);
+
+			if (event && !ps.repeatable) {
+				console.log(`Updating existing event for stage: ${ps.displayName}`);
+
+				// Update existing event data values
+				event.dataValues = event.dataValues.map((dv) => {
+					const newValue = values[dv.dataElement];
+
+					if (newValue !== undefined && newValue !== dv.value) {
+						dv.value = formatValue(newValue, dv.dataElement);
+					}
+
+					return dv;
+				});
+
+				// Add new data values if they don't already exist
+				Object.keys(values).forEach((key) => {
+					if (!event.dataValues.some((dv) => dv.dataElement === key)) {
+						const dataElement = ps.dataElements.find((de) => de.id === key);
+						if (dataElement) {
+							event.dataValues.push({
+								dataElement: key,
+								value: formatValue(values[key], key),
+							});
+						}
+					}
+				});
+
+				return event; // Return updated event only if changes exist
+			} else {
+				// If event doesn't exist, create a new one
+				console.log(`Creating new event for stage: ${ps.displayName}`);
+				const newEvent = {
+					programStage: ps.id,
+					program,
+					trackedEntity,
+					enrollment,
+					occurredAt: new Date().toISOString(),
+					status: "ACTIVE",
+					dataValues: Object.keys(values).map((key) => ({
+						dataElement: key,
+						value: formatValue(values[key], key),
+					})),
+				};
+
+				// Only return if at least one data value has a valid (non-null, non-empty) value
+				const hasValidValues = newEvent.dataValues.some((dv) => dv.value !== null && dv.value !== "");
+
+				return hasValidValues ? newEvent : null;
+			}
+		}).filter(Boolean); // Remove any null events (no changes)
+	};
+
+	// Helper function: Format attributes
+	const formatAttributes = (rowData) =>
+		Object.keys(rowData)
+			.filter((key) => attributesMetadata.some((attr) => attr.id === key))
+			.map((key) => {
+				const valueType = attributesMetadata.find((attr) => attr.id === key)?.valueType;
+				let value = rowData[key];
+
+				if (valueType?.includes("DATE") && value) {
+					value = value.toISOString();
+				}
+
+				return {attribute: key, value};
+			});
+
+	// Helper function: Format values based on data type
+	const formatValue = (value, dataElementId) => {
+		const valueType = programStages
+			.flatMap((ps) => ps.dataElements)
+			.find((de) => de.id === dataElementId)?.valueType;
+
+		if (valueType?.includes("DATE") && value) {
+			return value.toISOString();
+		}
+		if (valueType === "TRUE_ONLY" && !value) {
+			return null;
+		}
+
+		return value;
+	};
+
 
 	const excelDateToJSDate = (excelDate) => {
 		if (!excelDate) {
@@ -907,7 +995,6 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 	// Toggle expanded row
 	const handleRowClick = (rowIndex) => {
-		console.log('Rows', rows)
 		setExpandedRow(expandedRow === rowIndex ? null : rowIndex);
 	};
 
@@ -1029,18 +1116,18 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 			{/* Table */}
 			<div className="overflow-x-auto overflow-y-auto max-h-[500px] border border-gray-300 rounded-md bg-white">
-				{rows["Template"]?.length > 0 ? (
+				{rows['Template']?.length > 0 ? (
 					<table className="table-auto min-w-full border-collapse">
 						{/* Table Head */}
 						<thead className="bg-gray-200 sticky top-0 z-10">
 						<tr>
-							{Object.keys(headers["Template"]).map((idx) => (
+							{Object.keys(headers['Template']).map((idx) => (
 								<th
 									key={idx}
 									className="px-4 py-3 text-left text-gray-700 font-semibold border border-gray-300"
 								>
-									{headerName(headers["Template"][idx])}
-									{columRequired(headers["Template"][idx]) && (
+									{headerName(headers['Template'][idx])}
+									{columRequired(headers['Template'][idx]) && (
 										<span className="text-red-500">*</span>
 									)}
 								</th>
@@ -1050,84 +1137,77 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 						{/* Table Body */}
 						<tbody>
-						{rows["Template"].map((row, rowIndex) => (
-							<>
-								{/* Template Row */}
+						{rows['Template'].map((row, rowIndex) => (
+							<React.Fragment key={rowIndex}>
+								{/* Primary Row (Ensuring Separation) */}
 								<tr
-									key={rowIndex}
-									className={`cursor-pointer ${
+									className={`cursor-pointer border-t-4 border-blue-400 ${
 										rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
-									}`}
+									} hover:bg-blue-50 transition`}
 									onClick={() => handleRowClick(rowIndex)}
 								>
-									{Object.keys(attributes["Template"]).map((colIndex) => (
+									{Object.keys(attributes['Template']).map((colIndex) => (
 										<td
 											key={colIndex}
-											className="px-4 py-2 border border-gray-300 text-gray-800"
+											className="px-4 py-3 border border-gray-300 text-gray-800 font-medium"
 										>
-											{cellValue("Template", row, colIndex)}
+											{cellValue('Template', row, colIndex)}
 										</td>
 									))}
 								</tr>
 
-								{/* Expanded Data Rows */}
-								{expandedRow === rowIndex &&
-									Object.keys(rows)
-										.filter((key) => key !== "Template" && rows[key]?.length > 0)
-										.map((key) => (
-											<React.Fragment key={key}>
-												{/* Section Header for Expanded Data */}
-												<tr className="bg-gray-100">
-													<td
-														colSpan={
-															Object.keys(attributes["Template"]).length
-														}
-														className="px-4 py-2 font-semibold border border-gray-300"
-													>
-														{key} Data
-													</td>
-												</tr>
-
-												{/* Table Head for Expanded Section */}
-												<tr className="bg-gray-50">
-													{Object.keys(headers[key] || {}).map((colIdx) => (
-														<th
-															key={colIdx}
-															className="px-4 py-2 text-left text-gray-700 font-semibold border border-gray-300"
-														>
-															{headerName(headers[key][colIdx])}
-															{columRequired(headers[key][colIdx]) && (
-																<span className="text-red-500">*</span>
-															)}
-														</th>
-													))}
-												</tr>
-
-												{/* Rows for the Expanded Section */}
-												{rows[key].map((subRow, subRowIndex) => (
-													<tr
-														key={subRowIndex}
-														className={`${
-															subRowIndex % 2 === 0
-																? "bg-gray-50"
-																: "bg-white"
-														}`}
-													>
-														{Object.keys(attributes[key] || {}).map(
-															(colIndex) => (
+								{/* Expanded Data Rows (Now Visually Separated from Next Primary Row) */}
+								{expandedRow === rowIndex && (
+									<tr>
+										<td colSpan={Object.keys(attributes['Template']).length} className="p-0">
+											<div className="border-l-4 border-blue-400 bg-gray-100 rounded-lg mt-2 mb-2">
+												{Object.keys(rows)
+													.filter((key) => key !== 'Template' && rows[key]?.length > rowIndex)
+													.map((key) => (
+														<React.Fragment key={key}>
+															{/* Section Header for Expanded Data */}
+															<tr className="bg-gray-200 border-t-2 border-green-500">
 																<td
-																	key={colIndex}
-																	className="px-4 py-2 border border-gray-300 text-gray-800"
+																	colSpan={Object.keys(attributes['Template']).length}
+																	className="px-4 py-3 font-semibold border border-gray-300"
 																>
-																	{cellValue(key, subRow, colIndex)}
+																	{key} Data
 																</td>
-															)
-														)}
-													</tr>
-												))}
-											</React.Fragment>
-										))}
-							</>
+															</tr>
+
+															{/* Table Head for Expanded Section */}
+															<tr className="bg-blue-50">
+																{Object.keys(headers[key] || {}).map((colIdx) => (
+																	<th
+																		key={colIdx}
+																		className="px-4 py-2 text-left text-gray-700 font-semibold border border-gray-300"
+																	>
+																		{headerName(headers[key][colIdx])}
+																		{columRequired(headers[key][colIdx]) && (
+																			<span className="text-red-500">*</span>
+																		)}
+																	</th>
+																))}
+															</tr>
+
+															{/* Single Row for the Expanded Section (corresponding to rowIndex) */}
+															<tr className="bg-gray-50 border border-gray-400">
+																{Object.keys(attributes[key] || {}).map((colIndex) => (
+																	<td
+																		key={colIndex}
+																		className="px-4 py-3 border border-gray-300 text-gray-800"
+																	>
+																		{cellValue(key, rows[key][rowIndex], colIndex)}
+																	</td>
+																))}
+															</tr>
+														</React.Fragment>
+													))}
+											</div>
+										</td>
+									</tr>
+								)}
+							</React.Fragment>
 						))}
 						</tbody>
 					</table>
@@ -1137,6 +1217,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 					</div>
 				)}
 			</div>
+
 		</div>
 	);
 };
