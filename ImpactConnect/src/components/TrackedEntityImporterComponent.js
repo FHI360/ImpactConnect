@@ -431,7 +431,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 					existingTEI.attributes = updatedAttributes;
 					existingTEI.enrollments[0].attributes = updatedAttributes;
 
-					const updatedEvents = buildEvents(row, existingTEI.trackedEntity, existingTEI.enrollments[0].enrollment);
+					const updatedEvents = buildEvents(row, existingTEI.trackedEntity, existingTEI.enrollments[0].enrollment, existingTEI.orgUnit);
 					if (updatedEvents.length) {
 						existingTEI.enrollments[0].events = updatedEvents;
 					}
@@ -459,7 +459,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 				],
 			};
 
-			const newEvents = buildEvents(row, newTEI.trackedEntity, newTEI.enrollments[0].enrollment);
+			const newEvents = buildEvents(row, newTEI.trackedEntity, newTEI.enrollments[0].enrollment, row['Template'].orgUnit);
 			if (newEvents.length) {
 				newTEI.enrollments[0].events = newEvents;
 			}
@@ -498,7 +498,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		);
 	};
 
-	const buildEvents = (row, trackedEntity, enrollment) => {
+	const buildEvents = (row, trackedEntity, enrollment, orgUnit) => {
 		return programStages.map((ps) => {
 			const values = row[ps.displayName] || {};
 
@@ -539,6 +539,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 				const newEvent = {
 					programStage: ps.id,
 					program,
+					orgUnit,
 					trackedEntity,
 					enrollment,
 					occurredAt: new Date().toISOString(),
