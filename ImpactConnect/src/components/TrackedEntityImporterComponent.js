@@ -1084,7 +1084,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 							></path>
 						</svg>
 						<span className="text-sm font-medium">
-                    {loading ? 'Uploading...' : 'Click to upload a file'}
+                    {loading ? 'Uploading...' : 'Click to select template file'}
                 </span>
 					</label>
 					<input
@@ -1107,11 +1107,11 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 			<button
 				onClick={uploadTEIs}
 				className={`px-6 py-2 rounded-md font-medium transition ${
-					rows.length === 0
+					(rows[DATA_SHEET]?.length === 0) || (rows[DATA_SHEET]?.length === undefined)
 						? 'bg-gray-400 cursor-not-allowed'
 						: 'bg-green-600 hover:bg-green-700 text-white'
 				}`}
-				disabled={rows.length === 0 || loading}
+				disabled={(rows[DATA_SHEET]?.length === 0) || (rows[DATA_SHEET]?.length === undefined) || loading}
 			>
 				{loading ? (
 					<div className="flex items-center gap-2">
