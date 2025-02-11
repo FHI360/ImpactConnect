@@ -502,7 +502,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		const rowCount = Math.max(...Object.values(rows).map(list => list.length));
 
 		// Create an array where each object contains a row from each key at the same index
-		return Array.from({ length: rowCount }, (_, index) =>
+		return Array.from({length: rowCount}, (_, index) =>
 			Object.keys(rows).reduce((acc, key) => {
 				acc[key] = rows[key][index] || {}; // Use an empty object if index is out of bounds
 				return acc;
@@ -986,6 +986,22 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		return value;
 	};
 
+	const rowHasData = (sheet, row) => {
+		const hasNoData = Object.keys(row).map(k => {
+			const attribute = programStages.find(ps => ps.displayName === sheet)?.dataElements.find(de => de.id === k);
+			const valueType = attribute?.valueType;
+			const value = row[k];
+
+			if (valueType === 'BOOLEAN' && value === false) {
+				return true;
+			}
+
+			return !!value;
+		}).every(v => !v);
+
+		return !hasNoData;
+	}
+
 	const randomSheetName = (length) => {
 		let result = '';
 		const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -1179,9 +1195,11 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 								{expandedRow === rowIndex && (
 									<tr>
 										<td colSpan={Object.keys(attributes[DATA_SHEET]).length} className="p-0">
-											<div className="border-l-4 border-blue-400 bg-gray-100 rounded-lg mt-2 mb-2">
+											<div
+												className="border-l-4 border-blue-400 bg-gray-100 rounded-lg mt-2 mb-2">
 												{Object.keys(rows)
 													.filter((key) => key !== DATA_SHEET && rows[key]?.length > rowIndex)
+													.filter((key) => rowHasData(key, rows[key][rowIndex]))
 													.map((key) => (
 														<React.Fragment key={key}>
 															{/* Section Header for Expanded Data */}
