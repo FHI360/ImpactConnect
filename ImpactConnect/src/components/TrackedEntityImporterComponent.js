@@ -417,8 +417,17 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 		const trackedEntities = [];
 
+		const ids = (await engine.query({
+			ids: {
+				resource: 'system/id',
+				params: {
+					limit: rows[DATA_SHEET].length
+				}
+			}
+		})).ids.codes;
+
 		// Process each row
-		const processRow = async (row) => {
+		const processRow = async (row, id) => {
 			const teid = row[DATA_SHEET].trackedEntity;
 
 			if (teid) {
@@ -449,6 +458,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 				trackedEntityType,
 				orgUnit: row[DATA_SHEET].orgUnit,
 				attributes: newAttributes,
+				trackedEntity: id,
 				enrollments: [
 					{
 						program,
@@ -470,7 +480,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		};
 
 		try {
-			await Promise.all(transformRows(rows).map(processRow));
+			await Promise.all(transformRows(rows).map((row, idx) => processRow(row, ids[idx])));
 
 			try {
 				await createTrackedEntityInstance(trackedEntities);
