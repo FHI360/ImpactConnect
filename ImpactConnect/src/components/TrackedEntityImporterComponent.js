@@ -21,6 +21,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 	const [programStages, setProgramStages] = useState([]);
 	const [programStageData, setProgramStageData] = useState([]);
 	const [expandedRow, setExpandedRow] = useState(null);
+	const [trackedEntities, setTrackedEntities] = useState([]);
 
 	const engine = useDataEngine();
 
@@ -484,6 +485,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 
 			try {
 				await createTrackedEntityInstance(trackedEntities);
+				setTrackedEntities(trackedEntities);
 				setMessage("All TEIs uploaded successfully.");
 			} catch (error) {
 				console.error("Error uploading TEIs:", error);
@@ -620,6 +622,7 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		setMessage(null);
 		setErrors([]);
 		setRows({});
+		setTrackedEntities([]);
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
 		const reader = new FileReader();
@@ -1033,6 +1036,84 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 		setExpandedRow(expandedRow === rowIndex ? null : rowIndex);
 	};
 
+	const excelCellValue = (attr) => {
+		const attribute = attributesMetadata?.find(a => a.id === attr.attribute);
+		const valueType = attribute?.valueType;
+		const value = attr.value;
+
+		if (valueType === 'TRUE_ONLY' && !value) {
+			return '';
+		}
+
+		if (attribute?.options?.length) {
+			return attribute.options.find(option => option.code === value)?.displayName;
+		}
+
+		return value;
+	}
+
+	// Function to Create and Download Excel File
+	const downloadTrackedEntitiesExcel = async () => {
+		const workbook = new ExcelJS.Workbook();
+		const worksheet = workbook.addWorksheet("Tracked Entities");
+		const attributes = trackedEntities[0].attributes.map(attr => {
+			return  attributesMetadata.find(md => md.id === attr.attribute)?.displayName
+		})
+		// Define Header Row
+		const headers = ["Tracked Entity ID", "Organisation Unit", ...attributes];
+		worksheet.addRow(headers);
+
+		// Style Header Row
+		const headerRow = worksheet.getRow(1);
+		headerRow.font = {bold: true, color: {argb: "FFFFFF"}};
+		headerRow.alignment = {vertical: "middle", horizontal: "center"};
+		headerRow.fill = {type: "pattern", pattern: "solid", fgColor: {argb: "0070C0"}};
+		headerRow.eachCell((cell) => {
+			cell.border = {
+				top: {style: "thin"},
+				left: {style: "thin"},
+				bottom: {style: "thin"},
+				right: {style: "thin"}
+			};
+		});
+
+		// Populate Data Rows
+		trackedEntities.forEach((tei, rowIndex) => {
+			const rowData = [
+				tei.trackedEntity,
+				orgUnits.find(ou => ou.id === tei.orgUnit)?.displayName,
+				...tei.attributes.map(attr => excelCellValue(attr))
+			];
+			const row = worksheet.addRow(rowData);
+
+			// Style Data Rows (Zebra Striping)
+			if (rowIndex % 2 === 0) {
+				row.eachCell((cell) => {
+					cell.fill = {type: "pattern", pattern: "solid", fgColor: {argb: "F3F3F3"}};
+				});
+			}
+
+			row.eachCell((cell) => {
+				cell.border = {
+					top: {style: "thin"},
+					left: {style: "thin"},
+					bottom: {style: "thin"},
+					right: {style: "thin"}
+				};
+			});
+		});
+
+		// Auto-fit Columns
+		worksheet.columns.forEach(column => {
+			column.width = Math.max(15, ...column.values.map(v => (v ? v.toString().length : 0)) + 2);
+		});
+
+		// Generate and Download File
+		const buffer = await workbook.xlsx.writeBuffer();
+		const blob = new Blob([buffer], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+		saveAs(blob, "Tracked_Entities.xlsx");
+	}
+
 	return (
 		<div className="p-6 space-y-6 bg-gray-50 rounded-lg shadow-md">
 			{errors.length > 0 && (
@@ -1130,24 +1211,34 @@ export const TrackedEntityImporter = ({orgUnit, program, trackedEntityType, attr
 			</div>
 
 			{/* Upload Button */}
-			<button
-				onClick={uploadTEIs}
-				className={`px-6 py-2 rounded-md font-medium transition ${
-					(rows[DATA_SHEET]?.length === 0) || (rows[DATA_SHEET]?.length === undefined)
-						? 'bg-gray-400 cursor-not-allowed'
-						: 'bg-green-600 hover:bg-green-700 text-white'
-				}`}
-				disabled={(rows[DATA_SHEET]?.length === 0) || (rows[DATA_SHEET]?.length === undefined) || loading}
-			>
-				{loading ? (
-					<div className="flex items-center gap-2">
-						<span>Uploading...</span>
-						<span className="animate-bounce">...</span>
-					</div>
-				) : (
-					'Upload TEIs'
-				)}
-			</button>
+			{trackedEntities.length === 0 &&
+				<button
+					onClick={uploadTEIs}
+					className={`px-6 py-2 rounded-md font-medium transition ${
+						(rows[DATA_SHEET]?.length === 0) || (rows[DATA_SHEET]?.length === undefined)
+							? 'bg-gray-400 cursor-not-allowed'
+							: 'bg-green-600 hover:bg-green-700 text-white'
+					}`}
+					disabled={(rows[DATA_SHEET]?.length === 0) || (rows[DATA_SHEET]?.length === undefined) || loading}
+				>
+					{loading ? (
+						<div className="flex items-center gap-2">
+							<span>Uploading...</span>
+							<span className="animate-bounce">...</span>
+						</div>
+					) : (
+						'Upload TEIs'
+					)}
+				</button>
+			}
+			{trackedEntities.length > 0 &&
+				<button
+					onClick={downloadTrackedEntitiesExcel}
+					className={`px-6 py-2 rounded-md font-medium transition bg-green-600 hover:bg-green-700 text-white`}
+				>
+					Download Uploaded TEIs
+				</button>
+			}
 
 			{/* Table */}
 			<div className="overflow-x-auto overflow-y-auto max-h-[500px] border border-gray-300 rounded-md bg-white">
