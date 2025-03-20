@@ -11,7 +11,6 @@ import { Navigation } from './Navigation.js';
 import NotFoundPage from './NotFoundPage.js';
 import ProgramComponent from './ProgramComponent.js';
 import ProgramStageComponent from './ProgramStageComponent.js';
-
 const ConfigurationComponent = () => {
     const sharedState = useContext(SharedStateContext)
 
@@ -28,33 +27,32 @@ const ConfigurationComponent = () => {
         // Render the 404 page if the user doesn't have permission
         return <NotFoundPage />;
     }
-
-    const [keyExists, setKeyExists] = useState({});
-    const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
-    const [participantsProgram, setParticipantsProgram] = useState('');
-    const [trainingProgram, setTrainingProgram] = useState('');
-    const [selectedStage, setSelectedStage] = useState('');
-    const [attributes, setAttributes] = useState([]);
-    const [trainingAttributes, setTrainingAttributes] = useState([]);
-    const [trainingAttributesData, setTrainingAttributesData] = useState([]);
-    const [nameAttributes, setNameAttributes] = useState([]);
-    const [eventNameAttribute, setEventNameAttribute] = useState('');
-    const [eventLocationAttribute, setEventLocationAttribute] = useState('');
-    const [activeStage, setActiveStage] = useState('');
-    const [filterAttributes, setFilterAttributes] = useState([]);
-    const [dataElements, setDataElements] = useState([]);
-    const [configuredStages, setConfiguredStages] = useState({});
-    const [selectedDataElements, setSelectedDataElements] = useState([]);
-    const [selectedGroupDataElements, setSelectedGroupDataElements] = useState([]);
-    const [selectedIndividualDataElements, setSelectedIndividualDataElements] = useState([]);
-    const [endDateVisible, setEndDateVisible] = useState(false);
-    const [groupEdit, setGroupEdit] = useState(true);
-    const [configureMode, setConfigureMode] = useState(false);
-    const [editMode, setEditMode] = useState(false);
-    const [stages, setStages] = useState([]);
-    const [columnDisplay, setColumnDisplay] = useState(false);
-    const [scrollHeight, setScrollHeight] = useState('350px');
-    const [configuredCondition, setSelectedConfiguredCondition] = useState([]);
+const [keyExists, setKeyExists] = useState({});
+const [selectedProgram, setSelectedProgram] = useState(selectedSharedProgram);
+const [participantsProgram, setParticipantsProgram] = useState('');
+const [trainingProgram, setTrainingProgram] = useState('');
+const [selectedStage, setSelectedStage] = useState('');
+const [attributes, setAttributes] = useState([]);
+const [trainingAttributes, setTrainingAttributes] = useState([]);
+const [trainingAttributesData, setTrainingAttributesData] = useState([]);
+const [nameAttributes, setNameAttributes] = useState([]);
+const [eventNameAttribute, setEventNameAttribute] = useState('');
+const [eventLocationAttribute, setEventLocationAttribute] = useState('');
+const [activeStage, setActiveStage] = useState('');
+const [filterAttributes, setFilterAttributes] = useState([]);
+const [dataElements, setDataElements] = useState([]);
+const [configuredStages, setConfiguredStages] = useState({});
+const [selectedDataElements, setSelectedDataElements] = useState([]);
+const [selectedGroupDataElements, setSelectedGroupDataElements] = useState([]);
+const [selectedIndividualDataElements, setSelectedIndividualDataElements] = useState([]);
+const [endDateVisible, setEndDateVisible] = useState(false);
+const [groupEdit, setGroupEdit] = useState(true);
+const [configureMode, setConfigureMode] = useState(false);
+const [editMode, setEditMode] = useState(false);
+const [stages, setStages] = useState([]);
+const [columnDisplay, setColumnDisplay] = useState(false);
+const [scrollHeight, setScrollHeight] = useState('350px');
+const [configuredCondition, setSelectedConfiguredCondition] = useState([]);
 
     const engine = useDataEngine();
 
